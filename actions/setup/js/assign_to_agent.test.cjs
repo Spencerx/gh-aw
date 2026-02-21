@@ -1346,15 +1346,15 @@ describe("assign_to_agent", () => {
     await eval(`(async () => { ${assignToAgentScript}; await main(); })()`);
 
     expect(mockCore.setFailed).not.toHaveBeenCalled();
-    // Verify the mutation was called with custom instructions containing the branch instruction
+    // Verify the mutation was called with baseRef set to the explicit base-branch
     const lastCall = mockGithub.graphql.mock.calls[mockGithub.graphql.mock.calls.length - 1];
-    expect(lastCall[0]).toContain("customInstructions");
-    expect(lastCall[1].customInstructions).toContain("develop");
-    // NOT clause should reference the resolved default branch, not hardcoded 'main'
-    expect(lastCall[1].customInstructions).toContain("NOT from 'main'");
+    expect(lastCall[0]).toContain("baseRef: $baseRef");
+    expect(lastCall[1].baseRef).toBe("develop");
+    // customInstructions should NOT contain the branch instruction text
+    expect(lastCall[1].customInstructions).toBeUndefined();
   });
 
-  it("should auto-resolve non-main default branch from pull-request-repo and pass as instruction", async () => {
+  it("should auto-resolve non-main default branch from pull-request-repo and set as baseRef", async () => {
     process.env.GH_AW_AGENT_PULL_REQUEST_REPO = "test-owner/code-repo";
     // No GH_AW_AGENT_BASE_BRANCH set - should use repo's default branch
     setAgentOutput({
@@ -1376,13 +1376,13 @@ describe("assign_to_agent", () => {
 
     expect(mockCore.setFailed).not.toHaveBeenCalled();
     expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Resolved pull request repository default branch: develop"));
-    // Verify the mutation was called with custom instructions containing branch info
+    // Verify the mutation was called with baseRef set to the resolved default branch
     const lastCall = mockGithub.graphql.mock.calls[mockGithub.graphql.mock.calls.length - 1];
-    expect(lastCall[0]).toContain("customInstructions");
-    expect(lastCall[1].customInstructions).toContain("develop");
+    expect(lastCall[0]).toContain("baseRef: $baseRef");
+    expect(lastCall[1].baseRef).toBe("develop");
   });
 
-  it("should inject branch instruction even when pull-request-repo default branch is main (no explicit base-branch)", async () => {
+  it("should set baseRef when pull-request-repo default branch is main (no explicit base-branch)", async () => {
     process.env.GH_AW_AGENT_PULL_REQUEST_REPO = "test-owner/code-repo";
     // No GH_AW_AGENT_BASE_BRANCH set; repo default is main
     setAgentOutput({
@@ -1403,10 +1403,10 @@ describe("assign_to_agent", () => {
     await eval(`(async () => { ${assignToAgentScript}; await main(); })()`);
 
     expect(mockCore.setFailed).not.toHaveBeenCalled();
-    // Instruction is injected with the resolved default branch name (no NOT clause since it matches)
+    // Verify the mutation was called with baseRef set to the repo's default branch
     const lastCall = mockGithub.graphql.mock.calls[mockGithub.graphql.mock.calls.length - 1];
-    expect(lastCall[0]).toContain("customInstructions");
-    expect(lastCall[1].customInstructions).toContain("main");
-    expect(lastCall[1].customInstructions).not.toContain("NOT from");
+    expect(lastCall[0]).toContain("baseRef: $baseRef");
+    expect(lastCall[1].baseRef).toBe("main");
+    expect(lastCall[1].customInstructions).toBeUndefined();
   });
 });
