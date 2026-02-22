@@ -168,11 +168,9 @@ func normalizeJobNameForEnvVar(jobName string) string {
 			result.WriteString("_")
 		} else if (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') || char == '_' {
 			if char >= 'a' && char <= 'z' {
-				result.WriteString(string(char - 32)) // Convert to uppercase
-			} else if char >= 'A' && char <= 'Z' {
-				result.WriteString(string(char))
+				result.WriteRune(char - 32) // Convert to uppercase
 			} else {
-				result.WriteString(string(char))
+				result.WriteRune(char)
 			}
 		}
 	}
