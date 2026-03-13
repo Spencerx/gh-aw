@@ -24,6 +24,9 @@ mcp-servers:
       - multi_get
       - status
 
+resources:
+  - .github/workflows/qmd-docs-indexer.yml
+
 steps:
   - name: Setup Node.js
     uses: actions/setup-node@v6.3.0
