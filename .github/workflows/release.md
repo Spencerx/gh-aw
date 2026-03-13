@@ -218,7 +218,7 @@ jobs:
           echo "Ensure the sync-actions job has been run and the PR merged in github/gh-aw-actions before approving."
 
   release:
-    needs: ["pre_activation", "activation", "config"]
+    needs: ["pre_activation", "activation", "config", "sync_actions"]
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -23,7 +23,7 @@
 #
 # Build, test, and release gh-aw extension, then generate and prepend release highlights
 #
-# gh-aw-metadata: {"schema_version":"v2","frontmatter_hash":"6348d0076a2481a1e8e4d7761038c81f0cd54728f68ffa291a2f818b5c030c7f","strict":true}
+# gh-aw-metadata: {"schema_version":"v2","frontmatter_hash":"9cf910c2148ba6f578ef394b0f275005277ad2c468df820acdb679d1685b7f4d","strict":true}
 
 name: "Release"
 "on":
@@ -1272,6 +1272,7 @@ jobs:
       - activation
       - config
       - pre_activation
+      - sync_actions
     runs-on: ubuntu-latest
     permissions:
       attestations: write
