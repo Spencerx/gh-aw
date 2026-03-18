@@ -119,7 +119,7 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 			StepID:        "missing_tool",
 			MainJobName:   mainJobName,
 			CustomEnvVars: missingToolEnvVars,
-			Script:        "const { main } = require('/opt/gh-aw/actions/missing_tool.cjs'); await main();",
+			Script:        "const { main } = require('${{ runner.temp }}/gh-aw/actions/missing_tool.cjs'); await main();",
 			ScriptFile:    "missing_tool.cjs",
 			CustomToken:   data.SafeOutputs.MissingTool.GitHubToken,
 		})
@@ -248,7 +248,7 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 		StepID:        "handle_agent_failure",
 		MainJobName:   mainJobName,
 		CustomEnvVars: agentFailureEnvVars,
-		Script:        "const { main } = require('/opt/gh-aw/actions/handle_agent_failure.cjs'); await main();",
+		Script:        "const { main } = require('${{ runner.temp }}/gh-aw/actions/handle_agent_failure.cjs'); await main();",
 		ScriptFile:    "handle_agent_failure.cjs",
 		CustomToken:   "", // Will use default GITHUB_TOKEN
 		StepCondition: "always()",
@@ -279,7 +279,7 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 		StepID:        "handle_noop_message",
 		MainJobName:   mainJobName,
 		CustomEnvVars: noopMessageEnvVars,
-		Script:        "const { main } = require('/opt/gh-aw/actions/handle_noop_message.cjs'); await main();",
+		Script:        "const { main } = require('${{ runner.temp }}/gh-aw/actions/handle_noop_message.cjs'); await main();",
 		ScriptFile:    "handle_noop_message.cjs",
 		CustomToken:   "", // Will use default GITHUB_TOKEN
 	})
@@ -300,7 +300,7 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 			StepID:        "handle_create_pr_error",
 			MainJobName:   mainJobName,
 			CustomEnvVars: createPRErrorEnvVars,
-			Script:        "const { main } = require('/opt/gh-aw/actions/handle_create_pr_error.cjs'); await main();",
+			Script:        "const { main } = require('${{ runner.temp }}/gh-aw/actions/handle_create_pr_error.cjs'); await main();",
 			ScriptFile:    "handle_create_pr_error.cjs",
 			CustomToken:   "", // Will use default GITHUB_TOKEN
 		})

@@ -1,10 +1,14 @@
 package workflow
 
-import _ "embed"
+import (
+	_ "embed"
 
-// Prompt file paths at runtime (copied by setup action to /opt/gh-aw/prompts)
+	"github.com/github/gh-aw/pkg/constants"
+)
+
+// Prompt file paths at runtime (copied by setup action to ${RUNNER_TEMP}/gh-aw/prompts)
 const (
-	promptsDir                              = "/opt/gh-aw/prompts"
+	promptsDir                              = constants.GhAwRootDirShell + "/prompts"
 	prContextPromptFile                     = "pr_context_prompt.md"
 	tempFolderPromptFile                    = "temp_folder_prompt.md"
 	playwrightPromptFile                    = "playwright_prompt.md"
