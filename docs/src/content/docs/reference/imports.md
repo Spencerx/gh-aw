@@ -251,16 +251,6 @@ gh aw compile my-workflow
 >
 > `inlined-imports: true` cannot be combined with agent file imports (`.github/agents/` files). If your workflow imports a custom agent file, remove it before enabling inlined imports.
 
-## Best Practices
-
-**Layer configurations by scope**: Create base configurations with core tools, then extend with specialized imports. Use nested imports to build layered configurations.
-
-**Declare permissions explicitly**: Main workflows must explicitly declare all imported permissions - they are not automatically inherited.
-
-**Use semantic versioning**: Reference stable versions (`@v2.1.0`) in production, use branch names (`@main`) in development.
-
-**Flatten import chains**: Avoid deeply nested imports. Use direct imports to multiple shared files instead of chaining imports through multiple levels.
-
 ## Related Documentation
 
 - [Packaging and Updating](/gh-aw/guides/packaging-imports/) - Complete guide to managing workflow imports
