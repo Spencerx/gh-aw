@@ -395,9 +395,9 @@ func addWorkflowWithTracking(resolved *ResolvedWorkflow, tracker *FileTracker, o
 
 	// Handle engine override - add/update the engine field in frontmatter before source so
 	// the engine declaration appears above the source field in the final file.
-	// Copilot is the default engine, so we skip adding it to avoid unnecessary noise and
-	// prevent conflicts during later workflow updates.
-	if opts.EngineOverride != "" && opts.EngineOverride != string(constants.CopilotEngine) {
+	// The default engine is omitted to avoid unnecessary noise and prevent conflicts during
+	// later workflow updates.
+	if opts.EngineOverride != "" && opts.EngineOverride != string(constants.DefaultEngine) {
 		updatedContent, err := addEngineToWorkflow(content, opts.EngineOverride)
 		if err != nil {
 			if opts.Verbose {
