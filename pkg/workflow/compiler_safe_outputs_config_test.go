@@ -1437,10 +1437,13 @@ func TestAutoEnabledHandlers(t *testing.T) {
 // TestCreatePullRequestBaseBranch tests the base-branch field configuration
 func TestCreatePullRequestBaseBranch(t *testing.T) {
 	tests := []struct {
-		name                    string
-		baseBranch              string
-		expectedBaseBranch      string
-		shouldHaveBaseBranchKey bool
+		name                             string
+		baseBranch                       string
+		allowedBaseBranches              []string
+		expectedBaseBranch               string
+		shouldHaveBaseBranchKey          bool
+		expectedAllowedBaseBranches      []string
+		shouldHaveAllowedBaseBranchesKey bool
 	}{
 		{
 			name:                    "custom base branch",
@@ -1460,6 +1463,15 @@ func TestCreatePullRequestBaseBranch(t *testing.T) {
 			expectedBaseBranch:      "release/v1.0",
 			shouldHaveBaseBranchKey: true,
 		},
+		{
+			name:                             "allowed base branches list",
+			baseBranch:                       "main",
+			allowedBaseBranches:              []string{"release/*", "main"},
+			expectedBaseBranch:               "main",
+			shouldHaveBaseBranchKey:          true,
+			expectedAllowedBaseBranches:      []string{"release/*", "main"},
+			shouldHaveAllowedBaseBranchesKey: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1473,7 +1485,8 @@ func TestCreatePullRequestBaseBranch(t *testing.T) {
 						BaseSafeOutputConfig: BaseSafeOutputConfig{
 							Max: strPtr("1"),
 						},
-						BaseBranch: tt.baseBranch,
+						BaseBranch:          tt.baseBranch,
+						AllowedBaseBranches: tt.allowedBaseBranches,
 					},
 				},
 			}
@@ -1505,6 +1518,19 @@ func TestCreatePullRequestBaseBranch(t *testing.T) {
 							assert.Equal(t, tt.expectedBaseBranch, baseBranch, "base_branch should match expected value")
 						} else {
 							require.False(t, ok, "base_branch should NOT be in config when no custom value set")
+						}
+
+						allowedBaseBranches, ok := prConfig["allowed_base_branches"]
+						if tt.shouldHaveAllowedBaseBranchesKey {
+							require.True(t, ok, "allowed_base_branches should be in config")
+							allowedSlice, ok := allowedBaseBranches.([]any)
+							require.True(t, ok, "allowed_base_branches should be an array")
+							require.Len(t, allowedSlice, len(tt.expectedAllowedBaseBranches), "allowed_base_branches length should match")
+							for i, expected := range tt.expectedAllowedBaseBranches {
+								assert.Equal(t, expected, allowedSlice[i], "allowed_base_branches element should match")
+							}
+						} else {
+							require.False(t, ok, "allowed_base_branches should NOT be in config when no values set")
 						}
 					}
 				}
