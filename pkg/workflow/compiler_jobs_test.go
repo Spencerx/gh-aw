@@ -11,6 +11,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/testutil"
+	"github.com/goccy/go-yaml"
 )
 
 // ========================================
@@ -966,6 +967,227 @@ jobs:
 		"- name: Checkout repo",
 		"- name: Main work",
 	)
+}
+
+func TestPreStepsInsertAfterSetupBoundary(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "builtin-job-pre-steps-setup-boundary")
+
+	frontmatter := `---
+on: push
+permissions:
+  contents: read
+engine: copilot
+strict: false
+jobs:
+  pre_activation:
+    pre-steps:
+      - name: Pre-activation uses pre-step
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+  activation:
+    pre-steps:
+      - name: Activation run pre-step
+        run: echo "activation prep"
+---
+
+# Test Workflow
+`
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler := NewCompiler()
+	if err := compiler.CompileWorkflow(testFile); err != nil {
+		t.Fatalf("CompileWorkflow() error: %v", err)
+	}
+
+	lockFile := filepath.Join(tmpDir, "test.lock.yml")
+	content, err := os.ReadFile(lockFile)
+	if err != nil {
+		t.Fatalf("Failed to read lock file: %v", err)
+	}
+
+	yamlStr := string(content)
+	var lockFileYAML map[string]any
+	if err := yaml.Unmarshal(content, &lockFileYAML); err != nil {
+		t.Fatalf("Expected generated lock file to be valid YAML: %v", err)
+	}
+	jobsNode, ok := lockFileYAML["jobs"].(map[string]any)
+	if !ok {
+		t.Fatalf("Expected generated lock file to contain jobs map, got: %T", lockFileYAML["jobs"])
+	}
+	if _, ok := jobsNode["pre_activation"]; !ok {
+		t.Fatalf("Expected pre_activation job in parsed lock file YAML")
+	}
+	if _, ok := jobsNode["activation"]; !ok {
+		t.Fatalf("Expected activation job in parsed lock file YAML")
+	}
+
+	preActivationSection := extractJobSection(yamlStr, "pre_activation")
+	if preActivationSection == "" {
+		t.Fatal("Expected pre_activation section in lock file")
+	}
+	preActivationJobNameIdx := indexInNonCommentLinesInSection(preActivationSection, "job-name: ${{ github.job }}")
+	preActivationPreStepIdx := indexInNonCommentLinesInSection(preActivationSection, "- name: Pre-activation uses pre-step")
+	preActivationMembershipCheckIdx := indexInNonCommentLinesInSection(preActivationSection, "- name: Check team membership for workflow")
+	if preActivationJobNameIdx == -1 || preActivationPreStepIdx == -1 || preActivationMembershipCheckIdx == -1 {
+		t.Fatalf("Expected setup body, pre-step, and membership check in pre_activation section:\n%s", preActivationSection)
+	}
+	if preActivationPreStepIdx <= preActivationJobNameIdx {
+		t.Fatalf("Expected pre_activation pre-step to be inserted after setup step body in section:\n%s", preActivationSection)
+	}
+	if preActivationPreStepIdx >= preActivationMembershipCheckIdx {
+		t.Fatalf("Expected pre_activation pre-step before the first regular step in section:\n%s", preActivationSection)
+	}
+
+	activationSection := extractJobSection(yamlStr, "activation")
+	if activationSection == "" {
+		t.Fatal("Expected activation section in lock file")
+	}
+	activationJobNameIdx := indexInNonCommentLinesInSection(activationSection, "job-name: ${{ github.job }}")
+	activationPreStepIdx := indexInNonCommentLinesInSection(activationSection, "- name: Activation run pre-step")
+	activationCheckoutIdx := indexInNonCommentLinesInSection(activationSection, "- name: Checkout .github and .agents folders")
+	if activationJobNameIdx == -1 || activationPreStepIdx == -1 || activationCheckoutIdx == -1 {
+		t.Fatalf("Expected setup body, pre-step, and repository checkout in activation section:\n%s", activationSection)
+	}
+	if activationPreStepIdx <= activationJobNameIdx {
+		t.Fatalf("Expected activation pre-step to be inserted after setup step body in section:\n%s", activationSection)
+	}
+	if activationPreStepIdx >= activationCheckoutIdx {
+		t.Fatalf("Expected activation pre-step before checkout in section:\n%s", activationSection)
+	}
+}
+
+func TestInsertPreStepsAfterSetupBeforeCheckout(t *testing.T) {
+	tests := []struct {
+		name     string
+		steps    []string
+		preSteps []string
+		want     []string
+	}{
+		{
+			name: "insert at next step boundary after setup id",
+			steps: []string{
+				"      - name: Setup Scripts",
+				"        uses: actions/github-script@v7",
+				"        with:",
+				"          job-name: ${{ github.job }}",
+				"        id: setup",
+				"      - name: Checkout repository",
+				"        uses: actions/checkout@v6",
+			},
+			preSteps: []string{
+				"      - name: Pre setup",
+				"        run: echo \"pre\"",
+			},
+			want: []string{
+				"      - name: Setup Scripts",
+				"        uses: actions/github-script@v7",
+				"        with:",
+				"          job-name: ${{ github.job }}",
+				"        id: setup",
+				"      - name: Pre setup",
+				"        run: echo \"pre\"",
+				"      - name: Checkout repository",
+				"        uses: actions/checkout@v6",
+			},
+		},
+		{
+			name: "append when setup is final step and no boundary exists",
+			steps: []string{
+				"      - name: Setup Scripts",
+				"        uses: actions/github-script@v7",
+				"        id: setup",
+			},
+			preSteps: []string{
+				"      - name: Pre setup",
+				"        run: echo \"pre\"",
+			},
+			want: []string{
+				"      - name: Setup Scripts",
+				"        uses: actions/github-script@v7",
+				"        id: setup",
+				"      - name: Pre setup",
+				"        run: echo \"pre\"",
+			},
+		},
+		{
+			name: "insert before checkout when setup step is not present",
+			steps: []string{
+				"      - name: Checkout repository",
+				"        uses: actions/checkout@v6",
+				"      - name: Main work",
+				"        run: echo \"work\"",
+			},
+			preSteps: []string{
+				"      - name: Pre setup",
+				"        run: echo \"pre\"",
+			},
+			want: []string{
+				"      - name: Pre setup",
+				"        run: echo \"pre\"",
+				"      - name: Checkout repository",
+				"        uses: actions/checkout@v6",
+				"      - name: Main work",
+				"        run: echo \"work\"",
+			},
+		},
+		{
+			name: "insert before checkout shorthand step without name",
+			steps: []string{
+				"      - uses: actions/checkout@v6",
+				"      - name: Main work",
+				"        run: echo \"work\"",
+			},
+			preSteps: []string{
+				"      - name: Pre setup",
+				"        run: echo \"pre\"",
+			},
+			want: []string{
+				"      - name: Pre setup",
+				"        run: echo \"pre\"",
+				"      - uses: actions/checkout@v6",
+				"      - name: Main work",
+				"        run: echo \"work\"",
+			},
+		},
+		{
+			name: "return input steps unchanged when pre-steps are empty",
+			steps: []string{
+				"      - name: Main work",
+				"        run: echo \"work\"",
+			},
+			preSteps: []string{},
+			want: []string{
+				"      - name: Main work",
+				"        run: echo \"work\"",
+			},
+		},
+		{
+			name:  "insert pre-steps when steps are empty",
+			steps: []string{},
+			preSteps: []string{
+				"      - name: Pre setup",
+				"        run: echo \"pre\"",
+			},
+			want: []string{
+				"      - name: Pre setup",
+				"        run: echo \"pre\"",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := insertPreStepsAfterSetupBeforeCheckout(tt.steps, tt.preSteps)
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("insertPreStepsAfterSetupBeforeCheckout() mismatch\nwant:\n%q\ngot:\n%q", tt.want, got)
+			}
+		})
+	}
 }
 
 func TestCustomJobPreStepsSchemaValidation(t *testing.T) {
