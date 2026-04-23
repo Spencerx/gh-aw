@@ -96,10 +96,12 @@ function sanitizeContent(content, maxLengthOrOptions) {
   // preventing the full <!--...--> pattern from being matched.
   sanitized = applyToNonCodeRegions(sanitized, removeXmlComments);
 
-  // Remove markdown link titles — a steganographic injection channel analogous to HTML comments.
-  // Quoted title text ([text](url "TITLE") and [ref]: url "TITLE") is invisible in GitHub's
-  // rendered markdown (shown only as hover-tooltips) but reaches the AI model verbatim.
-  // Must run before mention neutralization for the same ordering reason as removeXmlComments.
+  // Neutralize markdown link titles as a hidden/steganographic injection channel analogous to
+  // HTML comments: inline-link titles are made visible in link text, while reference-style
+  // titles are stripped. Quoted title text ([text](url "TITLE") and [ref]: url "TITLE") is
+  // invisible in GitHub's rendered markdown (shown only as hover-tooltips) but reaches the AI
+  // model verbatim. Must run before mention neutralization for the same ordering reason as
+  // removeXmlComments.
   sanitized = applyToNonCodeRegions(sanitized, neutralizeMarkdownLinkTitles);
 
   // Neutralize @mentions with selective filtering (custom logic for allowed aliases)
