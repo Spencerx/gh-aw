@@ -248,6 +248,17 @@ func installWorkflowInTrialMode(ctx context.Context, tempDir string, parsedSpec 
 
 	content := fetched.Content
 
+	// When the fetch used a fallback path (e.g. .github/workflows/my-workflow.md
+	// instead of the short-form my-workflow.md), SourcePath holds the actual
+	// repo-root-relative path. Normalize parsedSpec so all downstream dependency
+	// resolution (source field, includes, imports, dispatch workflows, resources)
+	// uses the same effective workflow path.
+	if !fetched.IsLocal && fetched.SourcePath != "" && fetched.SourcePath != parsedSpec.WorkflowPath {
+		specCopy := *parsedSpec
+		specCopy.WorkflowPath = fetched.SourcePath
+		parsedSpec = &specCopy
+	}
+
 	// Add source field to frontmatter for remote workflows
 	if !fetched.IsLocal && fetched.CommitSHA != "" {
 		sourceString := buildSourceStringWithCommitSHA(parsedSpec, fetched.CommitSHA)

@@ -417,6 +417,15 @@ func addWorkflowWithTracking(resolved *ResolvedWorkflow, tracker *FileTracker, o
 	if sourceInfo != nil {
 		commitSHA = sourceInfo.CommitSHA
 	}
+	// When the fetch used a fallback path (e.g. .github/workflows/my-workflow.md instead
+	// of the short-form my-workflow.md), SourcePath holds the actual repo-root-relative
+	// path. Propagate it to workflowSpec so all downstream processing (source field,
+	// include/import resolution) uses the canonical path.
+	if sourceInfo != nil && !sourceInfo.IsLocal && sourceInfo.SourcePath != "" && sourceInfo.SourcePath != workflowSpec.WorkflowPath {
+		specCopy := *workflowSpec
+		specCopy.WorkflowPath = sourceInfo.SourcePath
+		workflowSpec = &specCopy
+	}
 	sourceString := buildSourceStringWithCommitSHA(workflowSpec, commitSHA)
 	if sourceString != "" {
 		updatedContent, err := addSourceToWorkflow(content, sourceString)
