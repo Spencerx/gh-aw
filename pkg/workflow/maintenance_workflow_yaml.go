@@ -20,8 +20,9 @@ func buildMaintenanceWorkflowYAML(
 	version, actionTag string,
 	resolver ActionSHAResolver,
 	configuredRunsOn RunsOnValue,
+	defaultBranch string,
 ) string {
-	maintenanceWorkflowYAMLLog.Printf("Building maintenance workflow YAML: actionMode=%s minExpiresDays=%d cronSchedule=%q", actionMode, minExpiresDays, cronSchedule)
+	maintenanceWorkflowYAMLLog.Printf("Building maintenance workflow YAML: actionMode=%s minExpiresDays=%d cronSchedule=%q defaultBranch=%q", actionMode, minExpiresDays, cronSchedule, defaultBranch)
 
 	var yaml strings.Builder
 
@@ -44,7 +45,19 @@ Schedule frequency is automatically determined by the shortest expiration time.`
 on:
   schedule:
     - cron: "` + cronSchedule + `"  # ` + scheduleDesc + ` (based on minimum expires: ` + strconv.Itoa(minExpiresDays) + ` days)
-  workflow_dispatch:
+`)
+
+	// Add push trigger in dev mode so compile-workflows runs when workflow files change
+	if actionMode == ActionModeDev {
+		yaml.WriteString(`  push:
+    branches:
+      - ` + defaultBranch + `
+    paths:
+      - '.github/workflows/*.md'
+`)
+	}
+
+	yaml.WriteString(`  workflow_dispatch:
     inputs:
       operation:
         description: 'Optional maintenance operation to run'
@@ -93,7 +106,7 @@ permissions: {}
 
 jobs:
   close-expired-entities:
-    if: ${{ ` + RenderCondition(buildNotForkAndScheduled()) + ` }}
+    if: ${{ ` + RenderCondition(buildNotForkAndScheduleOnly()) + ` }}
     runs-on: ` + runsOnValue + `
     permissions:
       discussions: write
@@ -161,7 +174,7 @@ jobs:
 	// Add cleanup-cache-memory job for scheduled runs and clean_cache_memories operation
 	// This job lists all caches starting with "memory-", groups them by key prefix,
 	// keeps the latest run ID per group, and deletes the rest.
-	cleanupCacheCondition := buildNotForkAndScheduledOrOperation("clean_cache_memories")
+	cleanupCacheCondition := buildNotForkAndScheduleOnlyOrOperation("clean_cache_memories")
 	yaml.WriteString(`
   cleanup-cache-memory:
     if: ${{ ` + RenderCondition(cleanupCacheCondition) + ` }}
@@ -611,6 +624,9 @@ jobs:
   compile-workflows:
     if: ${{ ` + RenderCondition(buildNotForkAndScheduled()) + ` }}
     runs-on: ` + runsOnValue + `
+    concurrency:
+      group: ${{ github.workflow }}-compile-workflows-${{ github.repository }}
+      cancel-in-progress: true
     permissions:
       contents: read
       issues: write
@@ -646,7 +662,7 @@ jobs:
             await main();
 
   secret-validation:
-    if: ${{ ` + RenderCondition(buildNotForkAndScheduled()) + ` }}
+    if: ${{ ` + RenderCondition(buildNotForkAndScheduleOnly()) + ` }}
     runs-on: ` + runsOnValue + `
     permissions:
       contents: read
