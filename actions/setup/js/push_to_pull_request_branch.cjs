@@ -10,7 +10,7 @@ const { updateActivationCommentWithCommit, updateActivationComment } = require("
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeBranchName } = require("./normalize_branch_name.cjs");
 const { pushExtraEmptyCommit } = require("./extra_empty_commit.cjs");
-const { detectForkPR } = require("./pr_helpers.cjs");
+const { detectForkPR, checkBranchPushable } = require("./pr_helpers.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { checkFileProtection } = require("./manifest_file_helpers.cjs");
@@ -57,6 +57,7 @@ async function main(config = {}) {
   const ifNoChanges = config.if_no_changes || "warn";
   const ignoreMissingBranchFailure = config.ignore_missing_branch_failure === true;
   const fallbackAsPullRequest = config.fallback_as_pull_request !== false;
+  const checkBranchProtection = config.check_branch_protection !== false;
   const commitTitleSuffix = config.commit_title_suffix || "";
   const maxSizeKb = config.max_patch_size ? parseInt(String(config.max_patch_size), 10) : 1024;
   const maxCount = config.max || 0; // 0 means no limit
@@ -93,6 +94,7 @@ async function main(config = {}) {
   core.info(`If no changes: ${ifNoChanges}`);
   core.info(`Ignore missing branch failure: ${ignoreMissingBranchFailure}`);
   core.info(`Fallback as pull request: ${fallbackAsPullRequest}`);
+  core.info(`Check branch protection: ${checkBranchProtection}`);
   if (commitTitleSuffix) {
     core.info(`Commit title suffix: ${commitTitleSuffix}`);
   }
@@ -407,57 +409,10 @@ async function main(config = {}) {
     // This prevents agents from pushing directly to branches that should only receive
     // changes through reviewed pull requests.
     {
-      // Check whether the branch is the repository default branch
-      let defaultBranch = null;
-      try {
-        const { data: repoData } = await githubClient.rest.repos.get({
-          owner: repoParts.owner,
-          repo: repoParts.repo,
-        });
-        defaultBranch = repoData.default_branch;
-      } catch (repoError) {
-        core.warning(`Could not check repository default branch: ${getErrorMessage(repoError)}`);
-      }
-
-      if (defaultBranch && branchName === defaultBranch) {
-        const msg = `Cannot push to branch "${branchName}": this is the repository's default branch. Agents must not push directly to the default branch.`;
-        core.error(msg);
-        return { success: false, error: msg };
-      }
-
-      // Check whether the branch has protection rules
-      let isBranchProtected = false;
-      try {
-        await githubClient.rest.repos.getBranchProtection({
-          owner: repoParts.owner,
-          repo: repoParts.repo,
-          branch: branchName,
-        });
-        // Successful response means branch protection rules exist
-        isBranchProtected = true;
-      } catch (protectionError) {
-        const protectionStatus = protectionError && typeof protectionError === "object" && "status" in protectionError ? protectionError.status : undefined;
-        if (protectionStatus === 404) {
-          // 404 means no protection rules – safe to proceed
-          core.info(`Branch "${branchName}" has no protection rules`);
-        } else if (protectionStatus === 403) {
-          // 403 means the token lacks permission to read branch protection rules.
-          // The GitHub platform will still enforce branch protection at push time,
-          // so warn and allow the push to proceed.
-          core.warning(`Could not check branch protection rules for "${branchName}" (insufficient permissions): ${getErrorMessage(protectionError)}`);
-        } else {
-          // Unexpected errors (5xx, network failures, etc.) – fail closed to
-          // avoid bypassing branch protection due to transient API issues.
-          const msg = `Cannot verify branch protection rules for "${branchName}": ${getErrorMessage(protectionError)}. Push blocked to prevent accidental writes to protected branches.`;
-          core.error(msg);
-          return { success: false, error: msg };
-        }
-      }
-
-      if (isBranchProtected) {
-        const msg = `Cannot push to branch "${branchName}": this branch has protection rules. Agents must not push directly to protected branches.`;
-        core.error(msg);
-        return { success: false, error: msg };
+      const blockReason = await checkBranchPushable(githubClient, repoParts.owner, repoParts.repo, branchName, checkBranchProtection);
+      if (blockReason) {
+        core.error(blockReason);
+        return { success: false, error: blockReason };
       }
     }
 

@@ -7213,6 +7213,11 @@
                   "description": "When true, adds workflows: write to the GitHub App token permissions. Required when allowed-files targets .github/workflows/ paths. Requires safe-outputs.github-app to be configured because the workflows permission is a GitHub App-only permission and cannot be granted via GITHUB_TOKEN.",
                   "default": false,
                   "examples": [true, false]
+                },
+                "check-branch-protection": {
+                  "type": "boolean",
+                  "description": "When false, skips the branch protection API pre-flight check before pushing. Set to false to avoid requiring administration: read permission. The GitHub platform will still enforce branch protection at push time. Default is true (check enabled).",
+                  "default": true
                 }
               },
               "additionalProperties": false
