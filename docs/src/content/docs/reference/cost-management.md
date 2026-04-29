@@ -72,13 +72,96 @@ gh aw logs --start-date -30d --json | \
 
 The JSON output includes `duration`, `token_usage`, `estimated_cost`, `workflow_name`, and `agent` (the engine ID) for each run under `.runs[]`.
 
-For orchestrated workflows, the same JSON also includes deterministic lineage under `.episodes[]` and `.edges[]`. The episode rollups expose aggregate fields such as `total_runs`, `total_tokens`, `total_estimated_cost`, `risky_node_count`, and `suggested_route`, which are more useful than raw per-run metrics when one logical job spans multiple workflow runs.
+For orchestrated workflows, the same JSON also includes deterministic lineage under `.episodes[]` and `.edges[]`. The episode rollups expose aggregate fields such as `total_runs`, `total_tokens`, `total_effective_tokens`, `total_estimated_cost`, `risky_node_count`, and `suggested_route`, which are more useful than raw per-run metrics when one logical job spans multiple workflow runs.
 
 ```bash
-# List episode-level cost and risk data over the past 30 days
+# List episode-level usage and risk data over the past 30 days
 gh aw logs --start-date -30d --json | \
-  jq '.episodes[] | {episode: .episode_id, workflow: .primary_workflow, runs: .total_runs, cost: .total_estimated_cost, risky_nodes: .risky_node_count}'
+  jq '.episodes[] | {episode: .episode_id, workflow: .primary_workflow, runs: .total_runs, effective_tokens: .total_effective_tokens, risky_nodes: .risky_node_count}'
 ```
+
+### Interpret Episode-Level Cost
+
+`gh aw logs --json` always computes deterministic episodes. Users do not need to decide whether a run "is an episode". The system already groups related runs and emits both views:
+
+- `.runs[]` for individual workflow runs
+- `.episodes[]` for the grouped logical execution
+- `.edges[]` for the inferred lineage between related runs
+
+Per-run cost is often the right reporting unit for simple workflows, but it can understate the real footprint of orchestrated systems. A single logical job may span multiple workflow runs:
+
+- an orchestrator run
+- one or more dispatched worker runs
+- one or more `workflow_call` follow-ups
+- a later `workflow_run` analysis or reporting pass
+
+When that happens, `.runs[]` shows the cost of each individual execution, while `.episodes[]` shows the aggregate cost of the whole logical execution chain. If you are trying to answer "what did this job really cost end-to-end?", read the episode view. If you are trying to identify which specific run was expensive, read the run view.
+
+Use `.edges[]` when you need to inspect why runs were grouped together. Each edge records the inferred parent-child relationship and the confidence of that relationship.
+
+Practical guidance:
+
+- Use `.runs[]` to find expensive individual runs.
+- Use `.episodes[]` to find expensive logical jobs that fan out across multiple runs.
+- Use `.edges[]` to debug unexpected lineage or confirm that the grouping reflects the orchestration you intended.
+
+Useful episode fields for cost analysis:
+
+- `total_runs` — how many workflow runs were part of the same logical execution
+- `total_tokens` — aggregate raw tokens across the episode
+- `total_effective_tokens` — aggregate effective tokens across the episode; use this as the primary cost proxy for Copilot runs
+- `total_duration` — wall-clock duration across the grouped runs
+- `primary_workflow` — the main workflow label for the episode
+- `resource_heavy_node_count` — how many runs in the episode were flagged as resource-heavy
+- `blocked_request_count` — aggregate blocked-network pressure across the episode
+
+For Copilot runs, prefer `total_effective_tokens` over `total_estimated_cost`. Copilot does not expose reliable billing-grade cost data to gh-aw, so `total_estimated_cost` should be treated as a heuristic rather than authoritative spend.
+
+Safe-output actuation is also available as a first-class signal in both `gh aw logs --json` and `gh aw audit <run-id>`. This is useful when a workflow creates an issue or PR and then immediately follows up with comments, delegation, or closure actions against the same temporary-ID target.
+
+Useful run-level fields in `gh aw logs --json`:
+
+- `temporary_id_map_status` — whether `temporary-id-map.json` was `loaded`, `missing`, or `invalid`
+- `temporary_id_mappings` — how many temporary IDs were resolved to concrete GitHub targets
+- `chained_target_count` — how many resolved temp-ID targets received more than one safe-output action
+- `chained_followup_action_count` — how many safe-output actions happened after the first action on those targets
+- `delegated_temp_target_count` — how many temp-ID targets were later delegated with `assign_to_agent` or `create_agent_session`
+- `closed_temp_target_count` — how many temp-ID targets were later closed or merged
+
+Useful repo-level summary fields in `gh aw logs --json`:
+
+- `runs_with_temporary_id_chains`
+- `runs_with_delegated_temp_targets`
+- `runs_with_missing_temporary_id_map`
+- `runs_with_invalid_temporary_id_map`
+- `total_temporary_id_mappings`
+- `total_chained_targets`
+- `total_chained_followup_actions`
+- `total_closed_temp_targets`
+
+The episode view also rolls these metrics up onto `.episodes[]`, so you can inspect chain intensity per logical execution rather than only per raw run.
+
+In `gh aw audit <run-id>`, the same metrics appear under `safe_output_summary`, alongside the per-type safe-output counts.
+
+When `temporary_id_map_status` is `missing` or `invalid`, gh-aw deliberately suppresses temp-ID-derived chain counts. That means `chained_target_count`, `chained_followup_action_count`, delegated-target counts, and closed-target counts fall back to `0` rather than guessing from incomplete data.
+
+```bash
+# Top 10 heaviest logical executions over the past 30 days by effective tokens
+gh aw logs --start-date -30d --json | \
+  jq '[.episodes[] | {episode: .episode_id, workflow: .primary_workflow, runs: .total_runs, effective_tokens: (.total_effective_tokens // 0), tokens: (.total_tokens // 0)}]
+      | sort_by(.effective_tokens)
+      | reverse
+      | .[:10]'
+```
+
+```bash
+# Inspect lineage edges for one heavy episode
+gh aw logs --start-date -30d --json | \
+  jq '(.episodes[] | select((.total_effective_tokens // 0) > 100000) | .episode_id) as $id
+      | {episode: $id, edges: [.edges[] | select(.episode_id == $id)]}'
+```
+
+If your workflow is not orchestrated, the automatically computed episode usually collapses to a single run. In that case, episode-level cost is effectively the same as the regular per-run cost, so `.episodes[]` and `.runs[]` are just two views of the same underlying execution. If your workflow dispatches workers or chains follow-up runs, episode-level cost is usually the more accurate optimization target.
 
 ### Use inside a workflow agent
 
