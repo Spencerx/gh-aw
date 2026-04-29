@@ -13,8 +13,9 @@
 //
 // # Type Conversion Helpers (any → []string)
 //
-//   - parseStringSliceAny() - Canonical coercion of []string/[]any to []string; skips non-strings
-//   - toStringSlice() - Strict variant: returns error on non-string elements; also accepts bare string
+//   - parseStringSliceAny() - Canonical coercion of []string/[]any to []string; skips non-string items.
+//     For GitHub Actions fields where a bare string is valid shorthand for a single-element list
+//     (e.g. `needs: job-name`, `state: failure`), handle the string case explicitly at the call site.
 //
 // # Design Rationale
 //
@@ -166,8 +167,19 @@ func preprocessProtectedFilesField(configData map[string]any, log *logger.Logger
 
 // parseStringSliceAny coerces a raw any value into a []string.
 // It accepts a []string (returned as-is), []any (string elements extracted),
-// or nil (returns nil). The log parameter is optional; pass nil to suppress
-// debug output about skipped non-string elements.
+// or nil (returns nil). Non-string elements inside a []any are skipped.
+// The log parameter is optional; pass nil to suppress debug output about skipped items.
+//
+// Bare string scalars are intentionally NOT wrapped — this preserves the existing
+// contract for callers (e.g. ParseStringArrayFromConfig) that treat a scalar string
+// as a type error rather than a single-element list.
+//
+// When GitHub Actions syntax allows a scalar as shorthand for a single-element list
+// (e.g. `needs: "job-name"`, `state: "failure"`), handle the string case explicitly
+// before calling this function:
+//
+//	if s, ok := raw.(string); ok { return []string{s} }
+//	return parseStringSliceAny(raw, log)
 func parseStringSliceAny(raw any, log *logger.Logger) []string {
 	if raw == nil {
 		return nil
@@ -191,30 +203,6 @@ func parseStringSliceAny(raw any, log *logger.Logger) []string {
 			log.Printf("parseStringSliceAny: unexpected type %T, ignoring", raw)
 		}
 		return nil
-	}
-}
-
-// toStringSlice converts an any value to a []string, supporting []string, []any, and string.
-// Unlike parseStringSliceAny, this function returns an error when a []any element is not a string,
-// and also accepts a bare string value (wrapping it in a single-element slice).
-func toStringSlice(val any) ([]string, error) {
-	switch v := val.(type) {
-	case []string:
-		return v, nil
-	case []any:
-		result := make([]string, 0, len(v))
-		for _, item := range v {
-			s, ok := item.(string)
-			if !ok {
-				return nil, errors.New("non-string item in list")
-			}
-			result = append(result, s)
-		}
-		return result, nil
-	case string:
-		return []string{v}, nil
-	default:
-		return nil, fmt.Errorf("unsupported type %T", val)
 	}
 }
 
