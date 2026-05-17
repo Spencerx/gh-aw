@@ -13,6 +13,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/errorutil"
 	"github.com/github/gh-aw/pkg/fileutil"
 	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/logger"
@@ -1033,13 +1034,15 @@ func fetchWorkflowRunMetadata(ctx context.Context, runID int64, owner, repo, hos
 			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(string(output)))
 		}
 		// Provide a human-readable error when the run ID doesn't exist.
-		// GitHub CLI / API may surface the 404 in several forms depending on version.
+		// The gh CLI may surface the 404 in the Go error (checked via errorutil.IsNotFoundError)
+		// or in its combined stdout/stderr output (checked below) depending on the CLI version.
+		// "Could not resolve" catches DNS failures from git clone fallbacks.
 		outputStr := string(output)
-		if strings.Contains(outputStr, "Not Found") ||
+		if errorutil.IsNotFoundError(err) ||
+			strings.Contains(outputStr, "Not Found") ||
 			strings.Contains(outputStr, "404") ||
 			strings.Contains(outputStr, "not found") ||
-			strings.Contains(outputStr, "Could not resolve") ||
-			strings.Contains(err.Error(), "404") {
+			strings.Contains(outputStr, "Could not resolve") {
 			return WorkflowRun{}, fmt.Errorf("workflow run %d not found. Please verify the run ID is correct and that you have access to the repository", runID)
 		}
 		return WorkflowRun{}, fmt.Errorf("failed to fetch run metadata: %w", err)
