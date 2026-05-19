@@ -420,6 +420,7 @@ func (c *Compiler) hasContentContext(frontmatter map[string]any) bool {
 		"discussion":                  true,
 		"discussion_comment":          true,
 		"slash_command":               true,
+		"pull_request_reviewer":       true,
 	}
 
 	for eventName := range onMap {
