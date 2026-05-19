@@ -307,6 +307,99 @@ describe("push_signed_commits integration tests", () => {
       expect(Buffer.from(variables.input.fileChanges.additions[0].contents, "base64").toString()).toBe("Hello World\n");
     });
 
+    it("should resolve temporary ID references in text file contents before GraphQL replay", async () => {
+      execGit(["checkout", "-b", "temp-id-branch"], { cwd: workDir });
+      fs.writeFileSync(path.join(workDir, "quarantine.cs"), '[QuarantinedTest("https://github.com/test-owner/test-repo/issues/#aw_test1")]\n// linked: #aw_test1\n');
+      execGit(["add", "quarantine.cs"], { cwd: workDir });
+      execGit(["commit", "-m", "Add quarantine reference"], { cwd: workDir });
+      execGit(["push", "-u", "origin", "temp-id-branch"], { cwd: workDir });
+
+      global.exec = makeRealExec(workDir);
+      const githubClient = makeMockGithubClient();
+
+      await pushSignedCommits({
+        githubClient,
+        owner: "test-owner",
+        repo: "test-repo",
+        branch: "temp-id-branch",
+        baseRef: "origin/main",
+        cwd: workDir,
+        resolvedTemporaryIds: {
+          aw_test1: { repo: "test-owner/test-repo", number: 66708 },
+        },
+        currentRepo: "test-owner/test-repo",
+      });
+
+      expect(githubClient.graphql).toHaveBeenCalledTimes(1);
+      const additions = githubClient.graphql.mock.calls[0][1].input.fileChanges.additions;
+      expect(additions).toHaveLength(1);
+      const resolvedContent = Buffer.from(additions[0].contents, "base64").toString();
+      expect(resolvedContent).toContain("https://github.com/test-owner/test-repo/issues/66708");
+      expect(resolvedContent).toContain("#66708");
+      expect(resolvedContent).not.toContain("#aw_test1");
+    });
+
+    it("should still run replacement logic for malformed temporary ID candidates and emit warning", async () => {
+      execGit(["checkout", "-b", "temp-id-malformed-candidate-branch"], { cwd: workDir });
+      fs.writeFileSync(path.join(workDir, "quarantine.cs"), "// malformed link: #aw_test-id\n");
+      execGit(["add", "quarantine.cs"], { cwd: workDir });
+      execGit(["commit", "-m", "Add malformed temporary ID reference"], { cwd: workDir });
+      execGit(["push", "-u", "origin", "temp-id-malformed-candidate-branch"], { cwd: workDir });
+
+      global.exec = makeRealExec(workDir);
+      const githubClient = makeMockGithubClient();
+
+      await pushSignedCommits({
+        githubClient,
+        owner: "test-owner",
+        repo: "test-repo",
+        branch: "temp-id-malformed-candidate-branch",
+        baseRef: "origin/main",
+        cwd: workDir,
+        resolvedTemporaryIds: {
+          aw_test: { repo: "test-owner/test-repo", number: 66708 },
+        },
+        currentRepo: "test-owner/test-repo",
+      });
+
+      expect(githubClient.graphql).toHaveBeenCalledTimes(1);
+      const additions = githubClient.graphql.mock.calls[0][1].input.fileChanges.additions;
+      const replayedContent = Buffer.from(additions[0].contents, "base64").toString();
+      expect(replayedContent).toContain("#66708-id");
+      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Malformed temporary ID reference '#aw_test-id'"));
+    });
+
+    it("should ignore invalid resolved temporary ID numbers instead of replacing with NaN", async () => {
+      execGit(["checkout", "-b", "temp-id-invalid-number-branch"], { cwd: workDir });
+      fs.writeFileSync(path.join(workDir, "quarantine.cs"), "// linked: #aw_test2\n");
+      execGit(["add", "quarantine.cs"], { cwd: workDir });
+      execGit(["commit", "-m", "Add temporary ID with invalid map entry"], { cwd: workDir });
+      execGit(["push", "-u", "origin", "temp-id-invalid-number-branch"], { cwd: workDir });
+
+      global.exec = makeRealExec(workDir);
+      const githubClient = makeMockGithubClient();
+
+      await pushSignedCommits({
+        githubClient,
+        owner: "test-owner",
+        repo: "test-repo",
+        branch: "temp-id-invalid-number-branch",
+        baseRef: "origin/main",
+        cwd: workDir,
+        resolvedTemporaryIds: {
+          aw_test2: { repo: "test-owner/test-repo", number: "not-a-number" },
+        },
+        currentRepo: "test-owner/test-repo",
+      });
+
+      expect(githubClient.graphql).toHaveBeenCalledTimes(1);
+      const additions = githubClient.graphql.mock.calls[0][1].input.fileChanges.additions;
+      const replayedContent = Buffer.from(additions[0].contents, "base64").toString();
+      expect(replayedContent).toContain("#aw_test2");
+      expect(replayedContent).not.toContain("#NaN");
+      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("ignoring invalid resolved temporary ID number for 'aw_test2'"));
+    });
+
     it("should call GraphQL once per commit for multiple new commits", async () => {
       execGit(["checkout", "-b", "multi-commit-branch"], { cwd: workDir });
 
