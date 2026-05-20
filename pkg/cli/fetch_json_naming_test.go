@@ -8,15 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestLooksLikeGUID(t *testing.T) {
-	t.Parallel()
-
-	assert.True(t, looksLikeGUID("b5a3f76a-3d8f-4790-b7e2-f2886f784345"))
-	assert.True(t, looksLikeGUID("{B5A3F76A-3D8F-4790-B7E2-F2886F784345}"))
-	assert.False(t, looksLikeGUID("weekly-research"))
-	assert.False(t, looksLikeGUID("12345678-1234-1234-1234-123456789ab"))
-}
-
 func TestSelectJSONImportNameOverride(t *testing.T) {
 	t.Parallel()
 
@@ -27,12 +18,12 @@ func TestSelectJSONImportNameOverride(t *testing.T) {
 		want        string
 	}{
 		{
-			name:        "keeps non-guid current name",
+			name:        "uses json name when available, overrides current name",
 			currentName: "weekly-research",
 			workflow: &JSONWorkflow{
 				Name: "Workflow Title",
 			},
-			want: "weekly-research",
+			want: "workflow-title",
 		},
 		{
 			name:        "uses json name when current name is guid",
@@ -51,7 +42,7 @@ func TestSelectJSONImportNameOverride(t *testing.T) {
 			want: "title-from-json",
 		},
 		{
-			name:        "keeps guid when no json name or title",
+			name:        "keeps current name when no json name or title",
 			currentName: "0be2cc4b-de12-43fe-ada7-55ef6dc8f3ba",
 			workflow:    &JSONWorkflow{},
 			want:        "0be2cc4b-de12-43fe-ada7-55ef6dc8f3ba",

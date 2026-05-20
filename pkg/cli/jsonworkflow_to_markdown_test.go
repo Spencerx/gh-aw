@@ -58,6 +58,16 @@ func TestConvertJSONWorkflowToMarkdown_NoIDOrName(t *testing.T) {
 	assert.Equal(t, "imported-workflow", gen.Filename)
 }
 
+func TestConvertJSONWorkflowToMarkdown_GUIDIDWithNoName(t *testing.T) {
+	wf := &JSONWorkflow{
+		ID:           "b5a3f76a-3d8f-4790-b7e2-f2886f784345",
+		Instructions: "Just instructions",
+	}
+	gen, err := ConvertJSONWorkflowToMarkdown(wf, ConvertOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, "imported-workflow", gen.Filename, "GUID id should not be used as filename")
+}
+
 func TestConvertJSONWorkflowToMarkdown_Tags(t *testing.T) {
 	wf := &JSONWorkflow{
 		ID:   "tagged",
@@ -198,7 +208,7 @@ func TestConvertJSONWorkflowToMarkdown_IntervalTrigger(t *testing.T) {
 	gen, err := ConvertJSONWorkflowToMarkdown(&wf, ConvertOptions{})
 	require.NoError(t, err)
 
-	assert.Equal(t, "b5a3f76a-3d8f-4790-b7e2-f2886f784345", gen.Filename, "filename from id")
+	assert.Equal(t, "haiku", gen.Filename, "filename from name")
 	assert.Contains(t, gen.Markdown, "description: Format and linter", "description in frontmatter")
 	assert.Contains(t, gen.Markdown, "# haiku", "heading from name")
 
@@ -249,7 +259,7 @@ func TestConvertJSONWorkflowToMarkdown_MultiTriggerWithTools(t *testing.T) {
 	gen, err := ConvertJSONWorkflowToMarkdown(&wf, ConvertOptions{})
 	require.NoError(t, err)
 
-	assert.Equal(t, "0be2cc4b-de12-43fe-ada7-55ef6dc8f3ba", gen.Filename, "filename from id")
+	assert.Equal(t, "issue-triage", gen.Filename, "filename from name")
 	assert.Contains(t, gen.Markdown, "# issue triage", "heading from name")
 
 	// Multi-trigger → map form (not string shorthand)

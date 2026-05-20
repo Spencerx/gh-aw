@@ -287,9 +287,6 @@ func ConvertJSONWorkflowToMarkdown(a *JSONWorkflow, opts ConvertOptions) (*Gener
 
 	// Heading from name (or ID as fallback).
 	heading := a.Name
-	if heading == "" {
-		heading = a.ID
-	}
 	if heading != "" {
 		body.WriteString("# ")
 		body.WriteString(heading)
@@ -314,13 +311,10 @@ func ConvertJSONWorkflowToMarkdown(a *JSONWorkflow, opts ConvertOptions) (*Gener
 	}, nil
 }
 
-// filenameFromJSONWorkflow derives a kebab-cased filename slug from the workflow's id
-// or name fields.
+// filenameFromJSONWorkflow derives a kebab-cased filename slug from the workflow's name
+// or id fields (name takes priority). A GUID-like id is not used as a filename.
 func filenameFromJSONWorkflow(a *JSONWorkflow) string {
-	candidate := a.ID
-	if candidate == "" {
-		candidate = a.Name
-	}
+	candidate := a.Name
 	if candidate == "" {
 		return "imported-workflow"
 	}

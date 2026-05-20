@@ -29,7 +29,6 @@ var shaResolutionRetryDelays = []time.Duration{
 }
 
 var transientHTTP5xxPattern = regexp.MustCompile(`http 5\d{2}`)
-var guidLikePattern = regexp.MustCompile(`(?i)^\{?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\}?$`)
 
 // FetchedWorkflow contains content and metadata from a directly fetched workflow file.
 // This is the unified type that combines content with source information.
@@ -276,6 +275,10 @@ func fetchGenericURLWorkflow(ctx context.Context, spec *WorkflowSpec, verbose bo
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Downloaded JSON workflow (%d bytes); converting to markdown...", len(resource.Body))))
 		}
 
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("JSON payload:\n"+string(resource.Body)))
+		}
+
 		var wf JSONWorkflow
 		if err := json.Unmarshal(resource.Body, &wf); err != nil {
 			return nil, fmt.Errorf("failed to parse JSON workflow from URL: %w", err)
@@ -319,7 +322,7 @@ func fetchGenericURLWorkflow(ctx context.Context, spec *WorkflowSpec, verbose bo
 }
 
 func selectJSONImportNameOverride(currentName string, wf *JSONWorkflow) string {
-	if !looksLikeGUID(currentName) || wf == nil {
+	if wf == nil {
 		return currentName
 	}
 
@@ -336,10 +339,6 @@ func selectJSONImportNameOverride(currentName string, wf *JSONWorkflow) string {
 	}
 
 	return currentName
-}
-
-func looksLikeGUID(value string) bool {
-	return guidLikePattern.MatchString(strings.TrimSpace(value))
 }
 
 func sanitizeJSONImportName(value string) string {
