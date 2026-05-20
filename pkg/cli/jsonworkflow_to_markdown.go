@@ -108,7 +108,7 @@ func (w *JSONWorkflow) UnmarshalJSON(data []byte) error {
 		"instructions": true, "prompt": true, "engine": true,
 		"on": true, "triggers": true, "tools": true, "permissions": true, "tags": true,
 		// Metadata fields returned by APIs that should be ignored during import.
-		"created_by": true, "disabled": true, "disabled_state": true, "updated_at": true,
+		"created_at": true, "created_by": true, "disabled": true, "disabled_state": true, "updated_at": true,
 	}
 	for k, v := range raw {
 		if !knownKeys[k] {
