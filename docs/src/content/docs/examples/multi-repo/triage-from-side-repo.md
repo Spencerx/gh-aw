@@ -192,16 +192,6 @@ Read the issue at ${{ github.event.inputs.issue_url }}, assign the most appropri
 
 Compile: `gh aw compile`.
 
-## Trade-offs
-
-| Approach | Isolation | Slash commands | Complexity |
-|----------|-----------|----------------|------------|
-| Side repo + bridge | High | Yes (via relay) | Two workflows per command |
-| Side repo scheduled only | High | No | Single workflow |
-| Workflows in main repo | None | Yes (direct) | Simpler setup |
-
-If you only need scheduled triage and don't need slash commands, skip steps 3–4 and use only the scheduled workflow.
-
 ## Related Documentation
 
 - [MultiRepoOps](/gh-aw/patterns/multi-repo-ops/) — Side repository pattern and other topologies

@@ -427,7 +427,7 @@ Here are our tips!
 - Set up appropriate notifications
 - Plan for eventual migration if successful
 
-**Learn more**: [MultiRepoOps — Side Repository](/gh-aw/patterns/multi-repo-ops/#side-repository-isolated-automation)
+**Learn more**: [MultiRepoOps — Side Repository](/gh-aw/patterns/multi-repo-ops/#the-side-repository-pattern-isolated-automation)
 
 ---
 
