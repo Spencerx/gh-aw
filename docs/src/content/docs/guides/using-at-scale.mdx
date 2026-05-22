@@ -3,14 +3,24 @@ title: Using at Scale in Organizations
 description: Guidance for adopting, sharing, and governing GitHub Agentic Workflows across teams and repositories.
 ---
 
-When agentic workflows move beyond a single repository and into an organization or enterprise, something qualitatively different becomes possible. Workflows can share knowledge and coordinate across dozens of repositories simultaneously — opening security advisories org-wide, synchronizing dependency updates, propagating policy changes, and maintaining living documentation that stays current automatically. Teams that were keeping up with their backlogs now find them shrinking. Projects that had drifted toward dormancy come back to life and achieve hight quality.
+When agentic workflows move beyond a single repository and into an organization or enterprise, something qualitatively different becomes possible. Workflows can coordinate or scale across dozens of repositories simultaneously. For example, workflows can:
+- Roll out changes org-wide
+- Assess code quality across 100s of repos
+- Synchronize dependency updates
+- Propagate coding policy changes
+- Maintain living documentation that stays current automatically
+- Shrink backlogs in multiple maintained repos
+- Enforce coding standards across teams
+- Aggregate issue tracking into a single control plane
 
-In this guide, we will explore recurring topics in organization and enterprise adoption of GitHub Agentic Workflows
+The possibilities are vast, but so are the challenges of secure authentication, cost management, and operational control at scale.
+
+In this guide, we will explore recurring topics in organization and enterprise adoption of GitHub Agentic Workflows, including:
 - How to share and reuse workflows across an organization
 - How to coordinate agentic work across multiple repositories
 - How to authenticate securely against private repositories
 - How to control network access and detect prompt injection
-- How to track and manage AI token costs
+- How to track, manage and reduce AI token costs
 - How to observe workflow behavior with OpenTelemetry
 - How to deploy on GitHub Enterprise Server and Cloud.
 - Safe rollout strategies for introducing production writes gradually
@@ -33,12 +43,12 @@ Workflows that read from or write to repositories other than the one they run in
 
 Agentic workflows run inside GitHub Actions and can make outbound network requests through the [network access](/gh-aw/reference/network/) sandbox layer. See the [Network Configuration guide](/gh-aw/guides/network-configuration/) for how to declare allowed domains, configure MCP server connectivity, and restrict outbound access. [Threat Detection](/gh-aw/reference/threat-detection/) provides runtime monitoring for prompt injection and unauthorized tool use.
 
-## Multi-Repository Patterns
+## Working Across Multiple Repositories
 
-gh-aw provides several design patterns for coordinating agentic workflows across multiple repositories:
+GitHub Agentic Workflows has multiple features for coordinating work across repositories. The main design patterns are:
 
-- [MultiRepoOps](/gh-aw/patterns/multi-repo-ops/) — run workflows from a **side repo** targeting your main codebase (keeping automation infrastructure separate), or **propagate changes** from a source repo to downstream repositories
-- [CentralRepoOps](/gh-aw/patterns/central-repo-ops/) — use a **central control plane** to dispatch org-wide rollouts and security patches across many repos, or a **central tracker repo** to aggregate events and visibility from component repositories
+- [CentralRepoOps](/gh-aw/patterns/central-repo-ops/) — a particular pattern to use a **central control repo** to dispatch org-wide rollouts or aggregate issues from component repositories
+- [MultiRepoOps](/gh-aw/patterns/multi-repo-ops/) — other multi-repo design patterns including using a **side repo** to target your main codebase (keeping automation infrastructure separate), or **propagate changes** from a one repo to another.
 
 ## Safe Rollout
 

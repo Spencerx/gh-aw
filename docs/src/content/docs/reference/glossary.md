@@ -138,7 +138,7 @@ Controls full Data Integrity and Flow Control (DIFC) proxy enforcement. When `to
 
 ### Integrity Reactions (`features.integrity-reactions`)
 
-A feature flag that enables GitHub reactions (👍, ❤️, 👎, 😕) to promote or demote content past the integrity filter. When `integrity-reactions: true` is set, trusted members can add a reaction to an issue or comment to elevate its integrity to `approved` (endorsement reactions) or demote it to `none` (disapproval reactions) — without modifying labels. Enabling this flag automatically activates `cli-proxy` mode, which is required to identify reaction authors at the network boundary. Available from gh-aw v0.68.2. See [Maintaining Repos](/gh-aw/practices/maintaining-repos/#reactions-as-trust-signals).
+A feature flag that enables GitHub reactions (👍, ❤️, 👎, 😕) to promote or demote content past the integrity filter. When `integrity-reactions: true` is set, trusted members can add a reaction to an issue or comment to elevate its integrity to `approved` (endorsement reactions) or demote it to `none` (disapproval reactions) — without modifying labels. Enabling this flag automatically activates `cli-proxy` mode, which is required to identify reaction authors at the network boundary. Available from gh-aw v0.68.2. See [Maintaining Repos](/gh-aw/examples/maintaining-repos/#reactions-as-trust-signals).
 
 ### Status Comment
 
@@ -824,7 +824,7 @@ Pattern for processing large volumes of work items efficiently using chunked pag
 
 ### Central Control Plane
 
-A [MultiRepoOps](#multirepoops) topology where a single private repository acts as a control plane for coordinating large-scale operations across many repositories. An orchestrator workflow filters and prioritizes targets, then dispatches per-repo worker workflows. Enables phased rollouts, policy updates, and centralized tracking using cross-repository safe outputs and secure authentication. See [MultiRepoOps — Central Control Plane](/gh-aw/patterns/multi-repo-ops/#the-central-control-plane-pattern-org-wide-rollouts).
+A [MultiRepoOps](#multirepoops) topology where a single private repository acts as a control plane for coordinating large-scale operations across many repositories. An orchestrator workflow filters and prioritizes targets, then dispatches per-repo worker workflows. Enables phased rollouts, policy updates, and centralized tracking using cross-repository safe outputs and secure authentication. See [MultiRepoOps — Central Control Plane](/gh-aw/patterns/central-repo-ops/#using-a-central-control-repository).
 
 ### CorrectionOps
 
@@ -864,7 +864,7 @@ AI-powered GitHub Projects board management automating issue triage, routing, an
 
 ### Side Repository
 
-A [MultiRepoOps](#multirepoops) topology where workflows run from a separate dedicated automation repository targeting your main codebase. Keeps AI-generated issues, comments, and workflow runs isolated from the main repository for cleaner separation between automation infrastructure and production code. See [MultiRepoOps — Side Repository](/gh-aw/patterns/multi-repo-ops/#the-side-repository-pattern-isolated-automation).
+A [MultiRepoOps](#multirepoops) topology where workflows run from a separate dedicated automation repository targeting your main codebase. Keeps AI-generated issues, comments, and workflow runs isolated from the main repository for cleaner separation between automation infrastructure and production code. See [MultiRepoOps — Side Repository](/gh-aw/patterns/multi-repo-ops/#using-a-side-repository).
 
 ### SpecOps
 
