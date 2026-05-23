@@ -213,6 +213,111 @@ function formatET(n) {
 }
 
 /**
+ * Build a deterministic 5-character model identifier for footer rendering.
+ * Uses well-known shortcuts for popular model families and a deterministic fallback.
+ *
+ * Examples:
+ * - claude-sonnet-4.6 -> son46
+ * - gpt-5.5 -> gpt55
+ * - claude-opus-4-7 -> opu47
+ *
+ * @param {string|undefined|null} modelName
+ * @returns {string}
+ */
+function reduceModelNameToIdentifier(modelName) {
+  const normalized = String(modelName || "")
+    .trim()
+    .toLowerCase();
+  if (!normalized) return "";
+
+  const VERSION_SUFFIX_PATTERN = "[-_\\s]*([0-9]+)(?:[._-]+([0-9]+))?";
+  const FALLBACK_LETTER_LENGTH = 3;
+  const FALLBACK_DIGIT_LENGTH = 2;
+  const FALLBACK_PADDING_CHAR = "x";
+
+  /** @type {Array<{ familyPattern: RegExp, versionPattern: RegExp, prefix: string }>} */
+  const shortcuts = [
+    { familyPattern: /sonnet/, versionPattern: new RegExp(`sonnet${VERSION_SUFFIX_PATTERN}`), prefix: "son" },
+    { familyPattern: /opus/, versionPattern: new RegExp(`opus${VERSION_SUFFIX_PATTERN}`), prefix: "opu" },
+    { familyPattern: /haiku/, versionPattern: new RegExp(`haiku${VERSION_SUFFIX_PATTERN}`), prefix: "hai" },
+    { familyPattern: /gpt/, versionPattern: new RegExp(`gpt${VERSION_SUFFIX_PATTERN}`), prefix: "gpt" },
+    { familyPattern: /gemini/, versionPattern: new RegExp(`gemini${VERSION_SUFFIX_PATTERN}`), prefix: "gem" },
+  ];
+
+  for (const { familyPattern, versionPattern, prefix } of shortcuts) {
+    if (!familyPattern.test(normalized)) continue;
+    const version = extractModelVersionDigits(normalized, versionPattern);
+    return `${prefix}${version}`;
+  }
+
+  return buildFallbackModelIdentifier(normalized, FALLBACK_LETTER_LENGTH, FALLBACK_DIGIT_LENGTH, FALLBACK_PADDING_CHAR);
+}
+
+/**
+ * @param {string} normalizedModelName
+ * @param {RegExp} familyVersionPattern
+ * @returns {string}
+ */
+function extractModelVersionDigits(normalizedModelName, familyVersionPattern) {
+  const familyMatch = normalizedModelName.match(familyVersionPattern);
+  if (familyMatch) {
+    return normalizeVersionDigits(familyMatch[1], familyMatch[2]);
+  }
+
+  const firstNumericMatch = normalizedModelName.match(/([0-9]+)(?:[._-]+([0-9]+))?/);
+  if (firstNumericMatch) {
+    return normalizeVersionDigits(firstNumericMatch[1], firstNumericMatch[2]);
+  }
+
+  return "00";
+}
+
+/**
+ * @param {string|undefined} major
+ * @param {string|undefined} minor
+ * @returns {string}
+ */
+function normalizeVersionDigits(major, minor) {
+  const majorDigit = getFirstDigit(major);
+  // Treat any 3+ digit minor segment as a build/date-like stamp (e.g. 100, 20250514),
+  // not a semantic minor version, so identifiers stay stable (gpt-5-2025-08-07 -> gpt50).
+  const minorIsDateLike = minor && /^\d{3,}$/.test(minor);
+  const minorDigit = getFirstDigit(minor, Boolean(minorIsDateLike));
+  return `${majorDigit}${minorDigit}`;
+}
+
+/**
+ * @param {string|undefined} value
+ * @param {boolean} [treatAsMissing=false]
+ * @returns {string}
+ */
+function getFirstDigit(value, treatAsMissing = false) {
+  if (!value || treatAsMissing) return "0";
+  const digitMatch = value.match(/\d/);
+  return digitMatch ? digitMatch[0] : "0";
+}
+
+/**
+ * @param {string} normalizedModelName
+ * @param {number} fallbackLetterLength
+ * @param {number} fallbackDigitLength
+ * @param {string} fallbackPaddingChar
+ * @returns {string}
+ */
+function buildFallbackModelIdentifier(normalizedModelName, fallbackLetterLength, fallbackDigitLength, fallbackPaddingChar) {
+  const compact = normalizedModelName.replace(/[^a-z0-9]+/g, "");
+  if (!compact) return "";
+
+  // Pad with "x" to keep a fixed family slot for short/unknown model names.
+  const letterPart = compact.replace(/[0-9]/g, "").slice(0, fallbackLetterLength).padEnd(fallbackLetterLength, fallbackPaddingChar);
+  const digitPart = compact
+    .replace(/[^0-9]/g, "")
+    .slice(0, fallbackDigitLength)
+    .padEnd(fallbackDigitLength, "0");
+  return `${letterPart}${digitPart}`.slice(0, 5);
+}
+
+/**
  * Resets the cached multipliers (for testing purposes).
  * @internal
  */
@@ -231,7 +336,9 @@ function getEffectiveTokensSuffix() {
   const parsed = parseInt(raw, 10);
 
   if (!isNaN(parsed) && parsed > 0) {
-    return ` · ● ${formatET(parsed)}`;
+    const reducedModel = reduceModelNameToIdentifier(process.env.GH_AW_ENGINE_MODEL);
+    const modelPrefix = reducedModel ? `${reducedModel} ` : "";
+    return ` · ● ${modelPrefix}${formatET(parsed)}`;
   }
   return "";
 }
@@ -336,6 +443,7 @@ module.exports = {
   computeBaseWeightedTokens,
   computeEffectiveTokens,
   formatET,
+  reduceModelNameToIdentifier,
   getEffectiveTokensSuffix,
   AGENT_USAGE_PATH,
   readAgentUsage,
