@@ -162,7 +162,7 @@ Use `{{#if experiments.prompt_style == "concise" }}` / `{{#else}}` / `{{/if}}` t
 
 > ⚠️ **Do not use internal env-var expansion syntax** (`__GH_AW_EXPERIMENTS__PROMPT_STYLE___detailed`). The compiler automatically expands `experiments.<name>` references — write `experiments.prompt_style == "concise"` and let the compiler handle the rest.
 
-**Typical metrics**: output quality score (human-rated), effective token count, action success rate, output length.
+**Typical metrics**: output quality score (human-rated), AI credit count, action success rate, output length.
 
 ### Engine & Model
 

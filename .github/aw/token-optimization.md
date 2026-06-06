@@ -47,7 +47,7 @@ gh aw audit <base-run-id> <optimized-run-id> --json
 gh aw audit <base-run-id> <variant-a-run-id> <variant-b-run-id> --json
 ```
 
-The diff highlights changes in effective tokens, tool calls, and safe outputs between runs. Equivalent via MCP: `audit` tool with `run_ids_or_urls: ["<base-run-id>", "<optimized-run-id>"]`.
+The diff highlights changes in AI credits, tool calls, and safe outputs between runs. Equivalent via MCP: `audit` tool with `run_ids_or_urls: ["<base-run-id>", "<optimized-run-id>"]`.
 
 ### Per-request token detail
 
@@ -288,7 +288,7 @@ Fetch open issues from ${{ github.repository }} using the GitHub tools.
 **After enough runs:**
 
 1. Compare variants using `gh aw audit <control-run-id> <optimized-run-id>`
-2. Check effective token deltas in the diff output
+2. Check AI credit deltas in the diff output
 3. If the optimized variant wins, rewrite the baseline prompt and remove the `experiments:` field
 
 **Key experiment dimensions for token optimization:**
@@ -359,12 +359,12 @@ To maximize cache hits:
 
 ---
 
-## Technique 9 — Cap Spend with Effective-Token Guardrails
+## Technique 9 — Cap Spend with AI-Credit Guardrails
 
-Two top-level frontmatter fields enforce ET budgets directly, independent of the techniques above. Both accept an integer or a `K`/`M` short-form string (e.g. `100M`, `500K`).
+Two top-level frontmatter fields enforce ET budgets directly, independent of the techniques above. Both accept an integer or a `K`/`M` short-form string (e.g. `100M`, `500K`). Typical workflow range: `100` to `2500`.
 
-- **`max-ai-credits:`** — Per-run ET budget enforced by the AWF firewall/API proxy (default `25000000`). The agent is steered to stay within budget; set a negative value to disable enforcement and steering.
-- **`max-daily-ai-credits:`** — Per-user 24-hour guardrail. At activation, gh-aw sums the triggering user's ET across their runs of this workflow over the last 24 hours and blocks execution once the total exceeds the threshold. Enabled by default with a system default threshold; set `-1` to disable, or an explicit value to override the default.
+- **`max-ai-credits:`** — Per-run AI credit budget enforced by the AWF firewall/API proxy (default `25000000`). The agent is steered to stay within budget; set a negative value to disable enforcement and steering.
+- **`max-daily-ai-credits:`** — Per-user 24-hour guardrail. At activation, gh-aw sums the triggering user's AI credits across their runs of this workflow over the last 24 hours and blocks execution once the total exceeds the threshold. Enabled by default with a system default threshold; set `-1` to disable, or an explicit value to override the default.
 
 ```yaml
 max-ai-credits: 100M        # per-run cap (short-form string)

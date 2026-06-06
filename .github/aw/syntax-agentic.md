@@ -310,7 +310,7 @@ description: Agentic workflow specific frontmatter fields for GitHub Agentic Wor
       config: |                         # Optional: additional TOML config appended to config.toml (codex engine only)
         [extra]
         key = "value"
-      token-weights:                    # Optional: custom token cost weights for effective token computation
+      token-weights:                    # Optional: custom token cost weights for AI credit computation
         multipliers:
           my-custom-model: 2.5          # 2.5x the cost of claude-sonnet-4.5 (= 1.0)
         token-class-weights:
