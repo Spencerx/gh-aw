@@ -2252,6 +2252,39 @@ describe("handle_agent_failure", () => {
       expect(result).toContain("`ls /usr/local/go/bin/go`");
     });
 
+    it("parses denied commands from alternatives when denied_commands is omitted", () => {
+      writePermissionDeniedTemplate();
+      const items = [
+        {
+          type: "missing_tool",
+          tool: "tool/permission",
+          reason: "permission denied",
+          alternatives: "Verify token scopes, repository permissions, and MCP/tool access configuration. Denied commands: shell(find specs -type f -name '*.md' | sort) | read(/home/runner/work/gh-aw/gh-aw/specs)",
+        },
+      ];
+      const result = buildPermissionDeniedContext(items);
+      expect(result).toContain("`shell(find specs -type f -name '*.md' | sort)`");
+      expect(result).toContain("`read(...)`");
+    });
+
+    it("parses denied commands from Daily SPDD Spec Planner alternatives", () => {
+      writePermissionDeniedTemplate();
+      const items = [
+        {
+          type: "missing_tool",
+          tool: "tool/permission",
+          reason: "numerous permission denied errors detected",
+          alternatives:
+            'Verify token scopes, repository permissions, and MCP/tool access configuration. Denied commands: shell(mkdir -p /tmp/gh-aw/cache-memory/spdd-daily/ && touch /tmp/gh-aw/cache-memory/spdd-daily/.preflight && echo "preflight_ok") | read(/home/runner/work/gh-aw/gh-aw) | read(/tmp/gh-aw/cache-memory/spdd-daily/rotation.json)',
+        },
+      ];
+      const result = buildPermissionDeniedContext(items);
+      expect(result).toContain('`shell(mkdir -p /tmp/gh-aw/cache-memory/spdd-daily/ && touch /tmp/gh-aw/cache-memory/spdd-daily/.preflight && echo "preflight_ok")`');
+      expect(result).toContain("`read(...)`");
+      expect(result).not.toContain("`read(/home/runner/work/gh-aw/gh-aw)`");
+      expect(result).not.toContain("`read(/tmp/gh-aw/cache-memory/spdd-daily/rotation.json)`");
+    });
+
     it("deduplicates denied commands across multiple tool/permission items", () => {
       writePermissionDeniedTemplate();
       const items = [
@@ -2265,6 +2298,23 @@ describe("handle_agent_failure", () => {
       expect(listOccurrences).toBe(1);
       expect(result).toContain("`ls /usr/local/go/bin/go`");
       expect(result).toContain("`which go`");
+    });
+
+    it("collapses read(path) denials to a single read(...) entry", () => {
+      writePermissionDeniedTemplate();
+      const items = [
+        {
+          type: "missing_tool",
+          tool: "tool/permission",
+          reason: "permission denied",
+          denied_commands: ["read(/home/runner/work/gh-aw/gh-aw)", "read(/tmp/gh-aw/cache-memory/spdd-daily/rotation.json)"],
+        },
+      ];
+      const result = buildPermissionDeniedContext(items);
+      const readOccurrences = (result.match(/`read\(\.\.\.\)`/g) || []).length;
+      expect(readOccurrences).toBe(1);
+      expect(result).not.toContain("`read(/home/runner/work/gh-aw/gh-aw)`");
+      expect(result).not.toContain("`read(/tmp/gh-aw/cache-memory/spdd-daily/rotation.json)`");
     });
 
     it("throws when permission_denied_context template is missing", () => {
