@@ -23,6 +23,7 @@ type ThreatDetectionConfig struct {
 	EngineConfig        *EngineConfig `yaml:"engine-config,omitempty"`     // Extended engine configuration for threat detection
 	EngineDisabled      bool          `yaml:"-"`                           // Internal flag: true when engine is explicitly set to false
 	RunsOn              string        `yaml:"runs-on,omitempty"`           // Runner override for the detection job
+	Environment         string        `yaml:"environment,omitempty"`       // GitHub Actions environment override for the detection job (defaults to top-level environment when OIDC is used)
 	ContinueOnError     *bool         `yaml:"continue-on-error,omitempty"` // When true (default), detection failures produce warnings instead of blocking safe outputs
 	EnabledExpr         *string       `yaml:"-"`                           // Expression form of the enabled flag, e.g. "${{ inputs.enable-threat-detection }}"
 	ContinueOnErrorExpr *string       `yaml:"-"`                           // Expression form of continue-on-error, e.g. "${{ inputs.coe }}"
@@ -1026,11 +1027,22 @@ func (c *Compiler) buildDetectionJob(data *WorkflowData) (*Job, error) {
 	}
 	permissions := perms.RenderToYAML()
 
+	// Determine environment: use threat detection override if set, otherwise inherit from
+	// the top-level environment (matching the same unconditional fallback used by agent
+	// and safe-output jobs so that environment-scoped secrets are accessible).
+	environment := data.Environment
+	if data.SafeOutputs.ThreatDetection.Environment != "" {
+		// ThreatDetectionConfig.Environment holds the raw environment name; normalize it to
+		// a YAML field so Job.Environment renders as "environment: <name>" not just "<name>".
+		environment = "environment: " + data.SafeOutputs.ThreatDetection.Environment
+	}
+
 	job := &Job{
 		Name:        string(constants.DetectionJobName),
 		Needs:       needs,
 		If:          jobCondition,
 		RunsOn:      c.indentYAMLLines(runsOn, "    "),
+		Environment: c.indentYAMLLines(environment, "    "),
 		Permissions: permissions,
 		Steps:       steps,
 		Outputs:     outputs,
