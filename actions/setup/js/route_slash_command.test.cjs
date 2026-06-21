@@ -94,6 +94,7 @@ describe("route_slash_command", () => {
     globals.core = {
       info: vi.fn(),
       warning: vi.fn(),
+      setOutput: vi.fn(),
       summary: summaryMock,
     };
     globals.github = {
@@ -167,6 +168,7 @@ describe("route_slash_command", () => {
     delete process.env.GH_AW_HELP_COMMANDS;
     delete process.env.GH_AW_HELP_COMMAND_ENABLED;
     delete process.env.GH_AW_SLASH_COMMAND_DOCS_URL;
+    delete process.env.GH_AW_SAFE_OUTPUT_MESSAGES;
     delete process.env.GITHUB_WORKSPACE;
     delete process.env.GITHUB_REF;
     delete process.env.GITHUB_HEAD_REF;
@@ -194,6 +196,83 @@ describe("route_slash_command", () => {
     expect(summaryMock.addRaw).toHaveBeenCalledWith("- Configured commands: 1", true);
     expect(summaryMock.addRaw).toHaveBeenCalledWith("<details><summary>Configured commands</summary>\n\n- `/archie`\n\n</details>", true);
     expect(summaryMock.write).toHaveBeenCalledWith({ overwrite: false });
+  });
+
+  it("creates an immediate status comment once and forwards it in aw_context", async () => {
+    process.env.GH_AW_SLASH_ROUTING = JSON.stringify({
+      archie: [
+        { workflow: "archie", events: ["issue_comment"], ai_reaction: "eyes", status_comment: true },
+        { workflow: "archie-secondary", events: ["issue_comment"], ai_reaction: "eyes", status_comment: true },
+      ],
+    });
+    globals.context.payload.issue.number = 77;
+    globals.context.payload.comment.body = "/archie please";
+    globals.github.request = vi.fn(async (route, params) => {
+      if (String(route).includes("/comments")) {
+        return {
+          data: {
+            id: 999,
+            html_url: "https://github.com/github/gh-aw/issues/77#issuecomment-999",
+          },
+        };
+      }
+      reactionCalls.push([route, params]);
+      return { data: { id: 1 } };
+    });
+
+    await main();
+
+    expect(dispatchCalls).toHaveLength(2);
+    const awContext = JSON.parse(dispatchCalls[0].inputs.aw_context);
+    expect(awContext.status_comment_id).toBe("999");
+    expect(awContext.status_comment_url).toBe("https://github.com/github/gh-aw/issues/77#issuecomment-999");
+    expect(awContext.status_comment_repo).toBe("github/gh-aw");
+    expect(JSON.parse(dispatchCalls[1].inputs.aw_context).status_comment_id).toBe("999");
+    expect(globals.github.request.mock.calls.filter(([route]) => String(route).includes("/reactions"))).toHaveLength(1);
+    expect(globals.github.request.mock.calls.filter(([route]) => /\/issues\/77\/comments$/.test(String(route)))).toHaveLength(1);
+    expect(globals.github.request).toHaveBeenCalledWith(
+      expect.stringContaining("/issues/77/comments"),
+      expect.objectContaining({
+        body: expect.stringContaining("has started processing this issue comment"),
+      })
+    );
+  });
+
+  it("does not create an immediate status comment when activation comments are disabled", async () => {
+    process.env.GH_AW_SLASH_ROUTING = JSON.stringify({
+      archie: [{ workflow: "archie", events: ["issue_comment"], status_comment: true }],
+    });
+    process.env.GH_AW_SAFE_OUTPUT_MESSAGES = JSON.stringify({ activationComments: false });
+    globals.context.payload.issue.number = 77;
+    globals.context.payload.comment.body = "/archie please";
+
+    await main();
+
+    expect(dispatchCalls).toHaveLength(1);
+    expect(JSON.parse(dispatchCalls[0].inputs.aw_context).status_comment_id).toBeUndefined();
+    expect(globals.github.request.mock.calls.filter(([route]) => /\/issues\/77\/comments$/.test(String(route)))).toHaveLength(0);
+    expect(globals.core.info).toHaveBeenCalledWith("activation-comments is disabled: skipping activation comment creation");
+  });
+
+  it("dispatches without status comment context when immediate status comment creation fails", async () => {
+    process.env.GH_AW_SLASH_ROUTING = JSON.stringify({
+      archie: [{ workflow: "archie", events: ["issue_comment"], status_comment: true }],
+    });
+    globals.context.payload.issue.number = 77;
+    globals.context.payload.comment.body = "/archie please";
+    globals.github.request = vi.fn(async route => {
+      if (String(route).includes("/comments")) {
+        throw new Error("comment API down");
+      }
+      reactionCalls.push([route]);
+      return { data: { id: 1 } };
+    });
+
+    await main();
+
+    expect(dispatchCalls).toHaveLength(1);
+    expect(JSON.parse(dispatchCalls[0].inputs.aw_context).status_comment_id).toBeUndefined();
+    expect(globals.core.warning).toHaveBeenCalledWith(expect.stringContaining("Immediate status comment failed"));
   });
 
   it("handles builtin /help by posting a context comment and skipping dispatch", async () => {
