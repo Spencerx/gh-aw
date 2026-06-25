@@ -2030,6 +2030,40 @@ function buildCredentialAuthErrorContext(auditJsonlPathOverride) {
   const templatePath = getPromptPath("credential_auth_error.md");
   return "\n" + renderTemplateFromFile(templatePath, { providers: providersList });
 }
+
+/**
+ * Build a context string when assign_to_agent reported assignment errors.
+ * Includes remediation guidance for token and Copilot access setup.
+ * @param {string} assignmentErrors
+ * @returns {string}
+ */
+function buildAssignmentErrorsContext(assignmentErrors) {
+  if (!assignmentErrors || !assignmentErrors.trim()) {
+    return "";
+  }
+
+  let context = buildWarningAlertLine("Agent Assignment Failed", "Failed to assign agent to issues or pull requests.");
+  context += "\n**Assignment Errors:**\n";
+
+  const errorLines = assignmentErrors.split("\n").filter(line => line.trim());
+  for (const errorLine of errorLines) {
+    const parts = errorLine.split(":");
+    if (parts.length >= 4) {
+      const type = parts[0]; // "issue" or "pr"
+      const number = parts[1];
+      const agent = parts[2];
+      const error = parts.slice(3).join(":");
+      context += `- ${type === "issue" ? "Issue" : "PR"} #${number} (agent: ${agent}): ${error}\n`;
+    }
+  }
+
+  context += "\nTo resolve this, verify the agent token and Copilot access configuration:\n";
+  context += "- Configure a valid `GH_AW_AGENT_TOKEN` with `issues: write` and `pull-requests: write` plus active Copilot entitlement\n";
+  context += "- If your org supports it, add `permissions: { copilot-requests: write }` to use org inference without a personal token\n";
+  context += "- Docs: https://github.github.com/gh-aw/reference/engines/#github-copilot-default\n\n";
+
+  return context;
+}
 /**
  * Build a context string when assigning the Copilot coding agent to created issues failed.
  * @param {boolean} hasAssignCopilotFailures - Whether any copilot assignments failed
@@ -2699,8 +2733,10 @@ async function main() {
     // in the engine output and sets the agentic_engine_timeout output.
     const isTimedOut = agentConclusion === "timed_out" || agenticEngineTimeout;
 
-    // Check if there are assignment errors (regardless of agent job status)
-    const hasAssignmentErrors = parseInt(assignmentErrorCount, 10) > 0;
+    // Check if there are assignment errors (regardless of agent job status).
+    // Use assignment_errors as the single source of truth because it includes
+    // both hard failures and skipped(ignore-if-error) assignment errors.
+    const hasAssignmentErrors = assignmentErrors.split("\n").some(line => line.trim());
 
     // Check if there are copilot assignment failures for created issues (regardless of agent job status)
     const hasAssignCopilotFailures = parseInt(assignCopilotFailureCount, 10) > 0;
@@ -3061,22 +3097,7 @@ async function main() {
         const runId = extractRunId(runUrl);
 
         // Build assignment errors context
-        let assignmentErrorsContext = "";
-        if (hasAssignmentErrors && assignmentErrors) {
-          assignmentErrorsContext = buildWarningAlertLine("Agent Assignment Failed", "Failed to assign agent to issues due to insufficient permissions or missing token.") + "\n**Assignment Errors:**\n";
-          const errorLines = assignmentErrors.split("\n").filter(line => line.trim());
-          for (const errorLine of errorLines) {
-            const parts = errorLine.split(":");
-            if (parts.length >= 4) {
-              const type = parts[0]; // "issue" or "pr"
-              const number = parts[1];
-              const agent = parts[2];
-              const error = parts.slice(3).join(":"); // Rest is the error message
-              assignmentErrorsContext += `- ${type === "issue" ? "Issue" : "PR"} #${number} (agent: ${agent}): ${error}\n`;
-            }
-          }
-          assignmentErrorsContext += "\n";
-        }
+        const assignmentErrorsContext = buildAssignmentErrorsContext(assignmentErrors);
 
         // Build create_discussion errors context
         const createDiscussionErrorsContext = hasCreateDiscussionErrors ? buildCreateDiscussionErrorsContext(createDiscussionErrors) : "";
@@ -3284,22 +3305,7 @@ async function main() {
         const issueTemplate = fs.readFileSync(issueTemplatePath, "utf8");
 
         // Build assignment errors context
-        let assignmentErrorsContext = "";
-        if (hasAssignmentErrors && assignmentErrors) {
-          assignmentErrorsContext = buildWarningAlertLine("Agent Assignment Failed", "Failed to assign agent to issues due to insufficient permissions or missing token.") + "\n**Assignment Errors:**\n";
-          const errorLines = assignmentErrors.split("\n").filter(line => line.trim());
-          for (const errorLine of errorLines) {
-            const parts = errorLine.split(":");
-            if (parts.length >= 4) {
-              const type = parts[0]; // "issue" or "pr"
-              const number = parts[1];
-              const agent = parts[2];
-              const error = parts.slice(3).join(":"); // Rest is the error message
-              assignmentErrorsContext += `- ${type === "issue" ? "Issue" : "PR"} #${number} (agent: ${agent}): ${error}\n`;
-            }
-          }
-          assignmentErrorsContext += "\n";
-        }
+        const assignmentErrorsContext = buildAssignmentErrorsContext(assignmentErrors);
 
         // Build create_discussion errors context
         const createDiscussionErrorsContext = hasCreateDiscussionErrors ? buildCreateDiscussionErrorsContext(createDiscussionErrors) : "";
@@ -3531,6 +3537,7 @@ module.exports = {
   loadToolDenialsExceededEvents,
   buildToolDenialsExceededContext,
   buildCredentialAuthErrorContext,
+  buildAssignmentErrorsContext,
   buildAICreditsRateLimitErrorContext,
   buildUnknownModelAICreditsContext,
   hasEngineMaxRunsExceededSignal,
