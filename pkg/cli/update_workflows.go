@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -21,6 +22,28 @@ import (
 	"github.com/github/gh-aw/pkg/semverutil"
 	"github.com/github/gh-aw/pkg/workflow"
 )
+
+var defaultBranchCache sync.Map
+var branchCommitCache sync.Map
+
+// repoBranchKey is a composite cache key for branch commit SHA lookups.
+type repoBranchKey struct {
+	repo   string
+	branch string
+}
+
+// clearUpdateResolutionCaches clears per-run ref-resolution caches so update
+// operations always start from fresh repository state.
+func clearUpdateResolutionCaches() {
+	defaultBranchCache.Range(func(key, value any) bool {
+		defaultBranchCache.Delete(key)
+		return true
+	})
+	branchCommitCache.Range(func(key, value any) bool {
+		branchCommitCache.Delete(key)
+		return true
+	})
+}
 
 // UpdateWorkflowsOptions configures workflow update behavior.
 type UpdateWorkflowsOptions struct {
@@ -42,6 +65,7 @@ type UpdateWorkflowsOptions struct {
 
 // UpdateWorkflows updates workflows from their source repositories
 func UpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error {
+	clearUpdateResolutionCaches()
 	updateLog.Printf("Scanning for workflows with source field: dir=%s, filter=%v, noMerge=%v, noCompile=%v, noRedirect=%v, disableSecurityScanner=%v, coolDown=%v", opts.WorkflowsDir, opts.WorkflowNames, opts.NoMerge, opts.NoCompile, opts.NoRedirect, opts.DisableSecurityScanner, opts.CoolDown)
 
 	// Use provided workflows directory or default
@@ -250,7 +274,7 @@ func resolveLatestRef(ctx context.Context, repo, currentRef string, allowMajor, 
 	}
 
 	// Get the latest commit SHA for the branch
-	latestSHA, err := getLatestBranchCommitSHA(ctx, repo, currentRef)
+	latestSHA, err := getLatestBranchCommitSHACached(ctx, repo, currentRef)
 	if err != nil {
 		return "", fmt.Errorf("failed to get latest commit for branch %s: %w", currentRef, err)
 	}
@@ -269,19 +293,18 @@ func resolveLatestRef(ctx context.Context, repo, currentRef string, allowMajor, 
 // logically track the default branch.
 func resolveLatestCommitFromDefaultBranch(ctx context.Context, repo, currentSHA string, verbose bool) (string, error) {
 	// Get the default branch name
-	defaultBranch, err := getRepoDefaultBranch(ctx, repo)
+	defaultBranch, err := getRepoDefaultBranchCached(ctx, repo)
 	if err != nil {
 		return "", fmt.Errorf("failed to get default branch for %s: %w", repo, err)
 	}
 
 	updateLog.Printf("Source is pinned to commit SHA, tracking default branch %q of %s", defaultBranch, repo)
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Source is pinned to commit SHA, checking default branch %q for updates", defaultBranch)))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Source has no branch ref, tracking default branch %q", defaultBranch)))
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Source has no branch ref, tracking default branch %q", defaultBranch)))
 
 	// Get the latest commit SHA from the default branch
-	latestSHA, err := getLatestBranchCommitSHA(ctx, repo, defaultBranch)
+	latestSHA, err := getLatestBranchCommitSHACached(ctx, repo, defaultBranch)
 	if err != nil {
 		return "", fmt.Errorf("failed to get latest commit for default branch %s: %w", defaultBranch, err)
 	}
@@ -289,6 +312,41 @@ func resolveLatestCommitFromDefaultBranch(ctx context.Context, repo, currentSHA 
 	updateLog.Printf("Latest commit on default branch %s: %s (current: %s)", defaultBranch, latestSHA, currentSHA)
 
 	return latestSHA, nil
+}
+
+// getRepoDefaultBranchCached wraps getRepoDefaultBranch with a cache to avoid
+// repeating identical GitHub API calls during batched update runs.
+func getRepoDefaultBranchCached(ctx context.Context, repo string) (string, error) {
+	if cached, ok := defaultBranchCache.Load(repo); ok {
+		if branch, isString := cached.(string); isString {
+			return branch, nil
+		}
+	}
+
+	branch, err := getRepoDefaultBranch(ctx, repo)
+	if err != nil {
+		return "", err
+	}
+	defaultBranchCache.Store(repo, branch)
+	return branch, nil
+}
+
+// getLatestBranchCommitSHACached wraps getLatestBranchCommitSHA with a cache
+// keyed by repo+branch to reduce repeated branch-head API lookups.
+func getLatestBranchCommitSHACached(ctx context.Context, repo, branch string) (string, error) {
+	key := repoBranchKey{repo: repo, branch: branch}
+	if cached, ok := branchCommitCache.Load(key); ok {
+		if sha, isString := cached.(string); isString {
+			return sha, nil
+		}
+	}
+
+	sha, err := getLatestBranchCommitSHA(ctx, repo, branch)
+	if err != nil {
+		return "", err
+	}
+	branchCommitCache.Store(key, sha)
+	return sha, nil
 }
 
 // fetchPublicGitHubAPI makes an unauthenticated GET request to the GitHub public
