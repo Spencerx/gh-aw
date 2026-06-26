@@ -444,11 +444,24 @@ func TestBuildOrgUpdateIssue(t *testing.T) {
 		Workflows: []orgWorkflowPreview{
 			{Name: "repo-assist", CurrentRef: "1111111", LatestRef: "2222222"},
 		},
-	})
+	}, "v1.2.3", "https://github.com/github/gh-aw/releases/tag/v1.2.3", "<!-- gh-aw-update: v1.2.3 -->")
 
 	assert.Equal(t, "[aw] Updates available", title)
 	assert.Contains(t, body, "## Agentic Workflows Update Available")
 	assert.Contains(t, body, "- `repo-assist`: `1111111` -> `2222222`")
+	assert.Contains(t, body, "Assign this issue to Copilot")
 	assert.Contains(t, body, "@copilot update agentic workflows")
 	assert.Contains(t, body, "Run `gh aw update`")
+	assert.Contains(t, body, "<!-- gh-aw-update: v1.2.3 -->")
+	assert.Contains(t, body, "https://github.com/github/gh-aw/releases/tag/v1.2.3")
+}
+
+func TestBuildOrgUpdateIssueNoRelease(t *testing.T) {
+	_, body := buildOrgUpdateIssue(orgRepoPreview{
+		Repo:      "octo/repo",
+		Workflows: []orgWorkflowPreview{{Name: "wf", CurrentRef: "aaa", LatestRef: "bbb"}},
+	}, "", "", "<!-- gh-aw-update: latest -->")
+
+	assert.Contains(t, body, "<!-- gh-aw-update: latest -->")
+	assert.NotContains(t, body, "View gh-aw release")
 }
