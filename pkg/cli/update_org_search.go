@@ -34,9 +34,43 @@ var searchOrgWorkflowReposFn = searchOrgWorkflowRepos
 //
 // It paginates through all code-search results, deduplicates by repository full
 // name, and returns a deterministically sorted slice of "owner/repo" strings.
-func searchOrgWorkflowRepos(ctx context.Context, org string, verbose bool) ([]string, error) {
-	query := fmt.Sprintf(`org:%s path:.github/workflows extension:md "source:"`, org)
+func searchOrgWorkflowRepos(ctx context.Context, org string, workflowNames []string, verbose bool) ([]string, error) {
+	query := buildOrgWorkflowSearchQuery(org, workflowNames)
 	return searchOrgReposByQuery(ctx, query, verbose)
+}
+
+// buildOrgWorkflowSearchQuery constructs the org-mode code-search query for
+// source-managed workflows. When workflowNames is empty, or every candidate
+// normalizes away, it falls back to the base query and relies on the later
+// per-repo workflow scan to enforce any requested filters.
+func buildOrgWorkflowSearchQuery(org string, workflowNames []string) string {
+	base := fmt.Sprintf(`org:%s path:.github/workflows extension:md "source:"`, org)
+	if len(workflowNames) == 0 {
+		return base
+	}
+
+	filenameFilters := make([]string, 0, len(workflowNames))
+	seen := make(map[string]struct{}, len(workflowNames))
+	for _, workflowName := range workflowNames {
+		normalized := normalizeWorkflowID(workflowName)
+		if normalized == "" || normalized == "." {
+			continue
+		}
+		filename := normalized + ".md"
+		if _, ok := seen[filename]; ok {
+			continue
+		}
+		seen[filename] = struct{}{}
+		filenameFilters = append(filenameFilters, "filename:"+filename)
+	}
+	if len(filenameFilters) == 0 {
+		// CLI validation already rejects empty workflow names, so this fallback is
+		// primarily a safety net for non-CLI callers and tests.
+		return base
+	}
+
+	slices.Sort(filenameFilters)
+	return base + " (" + strings.Join(filenameFilters, " OR ") + ")"
 }
 
 // searchOrgReposByQuery paginates through GitHub code-search results for the given
