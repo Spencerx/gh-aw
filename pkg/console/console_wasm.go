@@ -65,15 +65,15 @@ func FormatError(err CompilerError) string {
 }
 
 func FormatSuccessMessage(message string) string  { return "✓ " + message }
-func FormatInfoMessage(message string) string     { return "ℹ " + message }
+func FormatInfoMessage(message string) string     { return "i " + message }
 func FormatWarningMessage(message string) string  { return "⚠ " + message }
 func FormatErrorMessage(message string) string    { return "✗ " + message }
-func FormatLocationMessage(message string) string { return "📁 " + message }
-func FormatCommandMessage(command string) string  { return "⚡ " + command }
-func FormatProgressMessage(message string) string { return "🔨 " + message }
-func FormatPromptMessage(message string) string   { return "❓ " + message }
-func FormatCountMessage(message string) string    { return "📊 " + message }
-func FormatVerboseMessage(message string) string  { return "🔍 " + message }
+func FormatLocationMessage(message string) string { return "~ " + message }
+func FormatCommandMessage(command string) string  { return "$ " + command }
+func FormatProgressMessage(message string) string { return "▸ " + message }
+func FormatPromptMessage(message string) string   { return "? " + message }
+func FormatCountMessage(message string) string    { return "# " + message }
+func FormatVerboseMessage(message string) string  { return "» " + message }
 func FormatListHeader(header string) string       { return header }
 func FormatListItem(item string) string           { return "  • " + item }
 func FormatSectionHeader(header string) string    { return header }
