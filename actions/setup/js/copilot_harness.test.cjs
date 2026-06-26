@@ -31,6 +31,7 @@ const {
   AGENTIC_ENGINE_TIMEOUT_PATTERN,
   isDetectionPhase,
   isAuthenticationFailedError,
+  isRetryableProxyAuthenticationFailure,
   isMCPGatewayShutdownError,
   isModelAvailableInReflectData,
   isModelAvailableInReflectFile,
@@ -1154,6 +1155,23 @@ describe("copilot_harness.cjs", () => {
     });
   });
 
+  const PROXY_AUTH_FAILURE_OUTPUT = "Authentication failed with provider at http://api-proxy:10002 (HTTP 403).";
+
+  describe("isRetryableProxyAuthenticationFailure", () => {
+    it("returns true for gh-aw proxy auth failures after partial execution", () => {
+      expect(isRetryableProxyAuthenticationFailure(PROXY_AUTH_FAILURE_OUTPUT, true)).toBe(true);
+    });
+
+    it("returns false when the auth failure happened before any output was produced", () => {
+      expect(isRetryableProxyAuthenticationFailure(PROXY_AUTH_FAILURE_OUTPUT, false)).toBe(false);
+    });
+
+    it("returns false for non-proxy authentication failures", () => {
+      expect(isRetryableProxyAuthenticationFailure("Authentication failed (Request ID: ABC123)", true)).toBe(false);
+      expect(isRetryableProxyAuthenticationFailure("Authentication failed with provider at https://api.openai.com/v1 (HTTP 401).", true)).toBe(false);
+    });
+  });
+
   describe("envFlagEnabled", () => {
     it.each(["true", "TRUE", "True", "1", "yes", " YES "])("returns true for '%s'", v => {
       expect(envFlagEnabled(v)).toBe(true);
@@ -1168,8 +1186,8 @@ describe("copilot_harness.cjs", () => {
     });
   });
 
-  describe("auth error prevents retry", () => {
-    // Inline the same retry logic as the driver, including auth error check
+  describe("provider auth retry policy", () => {
+    // Inline the same retry logic as the driver for auth-related failures.
     const MCP_POLICY_BLOCKED_PATTERN = /MCP servers were blocked by policy:/;
     const NO_AUTH_INFO_PATTERN = /No authentication information found/;
     const MAX_RETRIES = 3;
@@ -1184,7 +1202,9 @@ describe("copilot_harness.cjs", () => {
       if (result.exitCode === 0) return false;
       // MCP policy errors are persistent — never retry
       if (MCP_POLICY_BLOCKED_PATTERN.test(result.output)) return false;
-      if (attempt === 0 && isAuthenticationFailedError(result.output)) return false;
+      if (isAuthenticationFailedError(result.output)) {
+        return attempt === 0 && isRetryableProxyAuthenticationFailure(result.output, result.hasOutput);
+      }
       // Auth error on --continue: fall back to fresh run once; on fresh run: bail
       if (NO_AUTH_INFO_PATTERN.test(result.output)) {
         return useContinueOnRetry && attempt < MAX_RETRIES;
@@ -1197,12 +1217,41 @@ describe("copilot_harness.cjs", () => {
       expect(shouldRetry(result, 0, false)).toBe(false);
     });
 
-    it("does not retry when first attempt reports authentication failed", () => {
+    it("retries once when the first attempt hits a proxy auth failure after partial execution", () => {
+      const result = {
+        exitCode: 1,
+        hasOutput: true,
+        output: PROXY_AUTH_FAILURE_OUTPUT,
+      };
+      expect(shouldRetry(result, 0, false)).toBe(true);
+    });
+
+    it("does not retry when proxy auth fails before any output was produced", () => {
+      const result = {
+        exitCode: 1,
+        hasOutput: false,
+        output: PROXY_AUTH_FAILURE_OUTPUT,
+      };
+      expect(shouldRetry(result, 0, false)).toBe(false);
+    });
+
+    it("does not retry generic authentication_failed errors that do not come from the gh-aw proxy", () => {
       const result = { exitCode: 1, hasOutput: true, output: "Authentication failed (Request ID: ABC123)" };
       expect(shouldRetry(result, 0, false)).toBe(false);
     });
 
-    it("retries as fresh run when auth fails on a --continue attempt", () => {
+    it("retries the first proxy auth failure only once", () => {
+      const result = {
+        exitCode: 1,
+        hasOutput: true,
+        output: PROXY_AUTH_FAILURE_OUTPUT,
+      };
+      expect(shouldRetry(result, 0, false)).toBe(true);
+      expect(shouldRetry(result, 1, false)).toBe(false);
+      expect(shouldRetry(result, 2, false)).toBe(false);
+    });
+
+    it("retries as fresh run when no-auth failure happens on a --continue attempt", () => {
       // This replicates the fix: attempt 1 ran for 3+ min then failed mid-stream,
       // attempt 2 (--continue) fails with auth error — driver retries once as fresh run.
       const continueResult = { exitCode: 1, hasOutput: true, output: "Error: No authentication information found." };
