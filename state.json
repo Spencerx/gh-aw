@@ -1,0 +1,16 @@
+{
+  "counts": {
+    "tone_variant": {
+      "neutral": 1
+    }
+  },
+  "runs": [
+    {
+      "run_id": "28534136187",
+      "timestamp": "2026-07-01T22:55:14.489Z",
+      "assignments": {
+        "tone_variant": "neutral"
+      }
+    }
+  ]
+}
