@@ -165,3 +165,80 @@ test.describe('Workshop tutorial', () => {
 		});
 	}
 });
+
+test.describe('Workshop URL hash navigation', () => {
+	test('encodes journey and scenario in the URL hash after setup', async ({ page }) => {
+		await page.goto('/gh-aw/workshop/');
+		await page.waitForLoadState('networkidle');
+
+		await page.locator('[data-workshop-journey="github"]').click();
+		expect(page.url()).toMatch(/#j=github$/);
+
+		await page.locator('[data-workshop-scenario="daily-status"]').click();
+		await expect(page.locator('[data-workshop-tutorial]')).toBeVisible();
+		expect(page.url()).toMatch(/#j=github&s=daily-status&t=.+$/);
+	});
+
+	test('encodes current step in the URL hash when navigating steps', async ({ page }) => {
+		await startWorkshop(page);
+
+		const initialUrl = page.url();
+		expect(initialUrl).toContain('#j=github&s=daily-status&t=');
+
+		await page.getByRole('button', { name: /Next step/i }).click();
+		const nextUrl = page.url();
+		expect(nextUrl).toContain('#j=github&s=daily-status&t=');
+		expect(nextUrl).not.toBe(initialUrl);
+	});
+
+	test('restores tutorial step from URL hash on direct navigation', async ({ page }) => {
+		await startWorkshop(page);
+
+		await page.getByRole('button', { name: /Next step/i }).click();
+		const tutorialUrl = page.url();
+		// Capture which step is currently displayed so we can assert the same step is restored.
+		const stepPosition = await page.locator('[data-workshop-step-position]').textContent();
+
+		// Navigate away so storage would otherwise default back to step 1.
+		await page.goto('/gh-aw/workshop/');
+		await page.waitForLoadState('networkidle');
+		// Clear session storage so the only source of truth for the step is the URL hash.
+		await page.evaluate(() => sessionStorage.clear());
+
+		// Navigate directly to the captured URL — hash must take precedence over (empty) storage.
+		await page.goto(tutorialUrl);
+		await page.waitForLoadState('networkidle');
+		await expect(page.locator('[data-workshop-tutorial]')).toBeVisible();
+		expect(page.url()).toBe(tutorialUrl);
+		// Assert the specific step is displayed, not merely some tutorial state.
+		await expect(page.locator('[data-workshop-step-position]')).toHaveText(stepPosition || '');
+	});
+
+	test('supports browser back navigation from tutorial to setup', async ({ page }) => {
+		await page.goto('/gh-aw/workshop/');
+		await page.waitForLoadState('networkidle');
+
+		await page.locator('[data-workshop-journey="github"]').click();
+		await page.locator('[data-workshop-scenario="daily-status"]').click();
+		await expect(page.locator('[data-workshop-tutorial]')).toBeVisible();
+
+		await page.locator('[data-workshop-change]').click();
+		await expect(page.locator('[data-workshop-setup]')).toBeVisible();
+
+		await page.goBack();
+		await expect(page.locator('[data-workshop-tutorial]')).toBeVisible();
+	});
+
+	test('supports browser back navigation from scenario picker to workspace picker', async ({ page }) => {
+		await page.goto('/gh-aw/workshop/');
+		await page.waitForLoadState('networkidle');
+
+		await page.locator('[data-workshop-journey="github"]').click();
+		expect(page.url()).toMatch(/#j=github$/);
+		await expect(page.locator('[data-workshop-setup-step="scenario"]')).toBeVisible();
+
+		await page.goBack();
+		await expect(page.locator('[data-workshop-setup-step="workspace"]')).toBeVisible();
+		expect(page.url()).not.toContain('#');
+	});
+});
