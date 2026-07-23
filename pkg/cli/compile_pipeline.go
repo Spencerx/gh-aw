@@ -37,6 +37,7 @@ import (
 )
 
 var compileOrchestrationLog = logger.New("cli:compile_pipeline")
+var runBatchYamllintOnFiles = RunYamllintOnFiles
 
 const fallbackCompilationErrorMessage = "compilation failed (no detailed error message available)"
 
@@ -65,6 +66,7 @@ func compileSpecificFiles(
 	var lockFilesForDirTools []string // lock files for directory-based tools (poutine, runner-guard)
 	var lockFilesForSyft []string     // lock files for syft container image SBOM scanning
 	var lockFilesForGrype []string    // lock files for grype container image vulnerability scanning
+	var lockFilesForYamllint []string // lock files for yamllint YAML linter
 
 	// Compile each specified file
 	for _, markdownFile := range config.MarkdownFiles {
@@ -150,11 +152,11 @@ func compileSpecificFiles(
 					if config.Poutine || config.RunnerGuard {
 						lockFilesForDirTools = append(lockFilesForDirTools, fileResult.lockFile)
 					}
-					if config.Grype {
-						lockFilesForGrype = append(lockFilesForGrype, fileResult.lockFile)
-					}
 					if config.Syft {
 						lockFilesForSyft = append(lockFilesForSyft, fileResult.lockFile)
+					}
+					if config.Yamllint {
+						lockFilesForYamllint = append(lockFilesForYamllint, fileResult.lockFile)
 					}
 				}
 			}
@@ -233,6 +235,18 @@ func compileSpecificFiles(
 			return workflowDataList, err
 		}
 		if err := RunGrypeOnLockFiles(lockFilesForGrype, config.Verbose && !config.JSONOutput, config.Strict); err != nil {
+			if config.Strict {
+				return workflowDataList, err
+			}
+		}
+	}
+
+	// Run yamllint on all collected lock files.
+	if config.Yamllint && !config.NoEmit && len(lockFilesForYamllint) > 0 {
+		if err := ctx.Err(); err != nil {
+			return workflowDataList, err
+		}
+		if err := runBatchYamllintOnFiles(lockFilesForYamllint, config.Verbose && !config.JSONOutput, config.Strict); err != nil {
 			if config.Strict {
 				return workflowDataList, err
 			}
@@ -336,6 +350,7 @@ func compileAllFilesInDirectory(
 	var lockFilesForDirTools []string // lock files for directory-based tools (poutine, runner-guard)
 	var lockFilesForSyft []string     // lock files for syft container image SBOM scanning
 	var lockFilesForGrype []string    // lock files for grype container image vulnerability scanning
+	var lockFilesForYamllint []string // lock files for yamllint YAML linter
 
 	for _, file := range mdFiles {
 		// Respect context cancellation between files (e.g. Ctrl+C)
@@ -390,11 +405,14 @@ func compileAllFilesInDirectory(
 					if config.Poutine || config.RunnerGuard {
 						lockFilesForDirTools = append(lockFilesForDirTools, fileResult.lockFile)
 					}
+					if config.Syft {
+						lockFilesForSyft = append(lockFilesForSyft, fileResult.lockFile)
+					}
 					if config.Grype {
 						lockFilesForGrype = append(lockFilesForGrype, fileResult.lockFile)
 					}
-					if config.Syft {
-						lockFilesForSyft = append(lockFilesForSyft, fileResult.lockFile)
+					if config.Yamllint {
+						lockFilesForYamllint = append(lockFilesForYamllint, fileResult.lockFile)
 					}
 				}
 			}
@@ -469,6 +487,18 @@ func compileAllFilesInDirectory(
 			return workflowDataList, err
 		}
 		if err := RunGrypeOnLockFiles(lockFilesForGrype, config.Verbose && !config.JSONOutput, config.Strict); err != nil {
+			if config.Strict {
+				return workflowDataList, err
+			}
+		}
+	}
+
+	// Run batch yamllint
+	if config.Yamllint && !config.NoEmit && len(lockFilesForYamllint) > 0 {
+		if err := ctx.Err(); err != nil {
+			return workflowDataList, err
+		}
+		if err := runBatchYamllintOnFiles(lockFilesForYamllint, config.Verbose && !config.JSONOutput, config.Strict); err != nil {
 			if config.Strict {
 				return workflowDataList, err
 			}
