@@ -1,0 +1,2 @@
+{"id":"secrets_analyzed","question":"Did the agent analyze secret usage patterns across compiled lock.yml workflow files?","answer":"UNKNOWN","model":"small","timestamp":"2026-07-31T03:58:42.699Z","runid":"30295947749"}
+{"id":"report_created","question":"Was a secrets analysis report produced with findings and recommendations?","answer":"UNKNOWN","model":"small","timestamp":"2026-07-31T03:58:42.699Z","runid":"30295947749"}
