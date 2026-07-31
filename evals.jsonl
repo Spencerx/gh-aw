@@ -1,0 +1,2 @@
+{"id":"analysis-completed","question":"Did the agent complete an analysis of recent commits and merged PRs for breaking CLI changes?","answer":"UNKNOWN","model":"small","timestamp":"2026-07-31T04:21:59.129Z","runid":"30286376673"}
+{"id":"issue-created-or-noop","question":"Was a breaking change issue created when breaking changes were found, or was noop correctly called when no breaking changes were detected?","answer":"UNKNOWN","model":"small","timestamp":"2026-07-31T04:21:59.129Z","runid":"30286376673"}
