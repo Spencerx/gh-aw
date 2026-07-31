@@ -1,0 +1,2 @@
+{"id":"large_files_analyzed","question":"Did the agent analyze the largest Go source files in the repository?","answer":"UNKNOWN","model":"small","timestamp":"2026-07-31T04:20:48.605Z","runid":"30279890035"}
+{"id":"issue_created_or_noop","question":"Was a refactoring issue created for files exceeding the healthy size threshold, or was noop used when all files were within limits?","answer":"UNKNOWN","model":"small","timestamp":"2026-07-31T04:20:48.605Z","runid":"30279890035"}
