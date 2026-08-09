@@ -4,3 +4,4 @@
 {"run_id":"30578742400","timestamp":"2026-07-31T03:47:58.702Z","assignments":{"sub_agent_strategy":"delegated_sequential"}}
 {"run_id":"30765170649","timestamp":"2026-08-03T02:23:00.206Z","assignments":{"sub_agent_strategy":"inline_strict"}}
 {"run_id":"31044859407","timestamp":"2026-08-06T04:57:20.188Z","assignments":{"sub_agent_strategy":"inline_strict"}}
+{"run_id":"31274861065","timestamp":"2026-08-09T04:53:03.998Z","assignments":{"sub_agent_strategy":"single_agent_control"}}
