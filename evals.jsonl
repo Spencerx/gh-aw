@@ -1,2 +1,4 @@
 {"id":"benchmarks_run","question":"Did the agent run CLI performance benchmarks and track performance trends?","answer":"UNKNOWN","model":"small","timestamp":"2026-08-02T05:22:52.048Z","runid":"30469535417"}
 {"id":"report_created_or_regression_flagged","question":"Was a performance report produced, or was a regression flagged when performance degraded?","answer":"UNKNOWN","model":"small","timestamp":"2026-08-02T05:22:52.048Z","runid":"30469535417"}
+{"id":"benchmarks_run","question":"Did the agent run CLI performance benchmarks and track performance trends?","answer":"UNKNOWN","model":"evals","timestamp":"2026-08-11T10:38:21.549Z","runid":"31193634830"}
+{"id":"report_created_or_regression_flagged","question":"Was a performance report produced, or was a regression flagged when performance degraded?","answer":"UNKNOWN","model":"evals","timestamp":"2026-08-11T10:38:21.549Z","runid":"31193634830"}
