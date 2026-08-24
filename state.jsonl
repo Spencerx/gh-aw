@@ -8,3 +8,4 @@
 {"run_id":"30811701496","timestamp":"2026-08-03T12:34:43.424Z","assignments":{"detail_level":"comprehensive"}}
 {"run_id":"31377149083","timestamp":"2026-08-10T10:33:03.624Z","assignments":{"detail_level":"brief"}}
 {"run_id":"32014749310","timestamp":"2026-08-17T09:46:59.332Z","assignments":{"detail_level":"brief"}}
+{"run_id":"32711628180","timestamp":"2026-08-24T10:29:37.271Z","harness_version":"e28b4232a2e4138548a39da0bd54fbd56f9db1da6543bb3e8d79f985f2812e38:222077f693270e01883e9e2b8a83ab3f160a0b2f88ddbe2897667a2e29cab546","assignments":{"detail_level":"brief"}}
