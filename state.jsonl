@@ -9,3 +9,4 @@
 {"run_id":"31835122989","timestamp":"2026-08-15T14:23:13.923Z","assignments":{"sub_agent_strategy":"inline_strict"}}
 {"run_id":"32061094459","timestamp":"2026-08-18T20:03:45.058Z","assignments":{"sub_agent_strategy":"inline_strict"}}
 {"run_id":"32177282348","timestamp":"2026-08-22T15:47:56.102Z","harness_version":"","assignments":{"sub_agent_strategy":"single_agent_control"}}
+{"run_id":"32593829880","timestamp":"2026-08-25T15:56:31.374Z","harness_version":"c353474561ffe102fead57525a110e5fff09f0c18923938b574aeab5cce00ed9:0daed06ad9ab37f712e54a71683b2f3c690ab0cce61735ab8ecf312216a2f4ec","assignments":{"sub_agent_strategy":"delegated_sequential"}}
