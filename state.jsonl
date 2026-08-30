@@ -38,3 +38,4 @@
 {"run_id":"32258200813","timestamp":"2026-08-22T16:08:02.528Z","harness_version":"","assignments":{"prompt_compression":"verbose"}}
 {"run_id":"32374562852","timestamp":"2026-08-25T16:09:32.145Z","harness_version":"","assignments":{"prompt_compression":"verbose"}}
 {"run_id":"32487027331","timestamp":"2026-08-28T14:49:34.547Z","harness_version":"","assignments":{"prompt_compression":"verbose"}}
+{"run_id":"32575249194","timestamp":"2026-08-30T15:03:16.002Z","harness_version":"","assignments":{"prompt_compression":"caveman"}}
